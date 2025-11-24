@@ -2,12 +2,11 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import ForceGraph3D from '3d-force-graph';
 import SpriteText from 'three-spritetext';
 import * as THREE from 'three';
-import { DynamoDBService, type GraphData, type Researcher, type Paper } from '../services/dynamodb';
+import { fetchGraphData, type GraphData, type Researcher, type Paper } from '../services/dynamodb';
 import ResearcherProfilePanel from './ResearcherProfilePanel';
 import ResearcherModal from './ResearcherModal';
 import SearchBar from './SearchBar';
 import RecommendationsModal from './RecommendationsModal';
-import { bedrockRAGService } from '@/services/bedrock';
 import PaperChatModal from './PaperChatModal';
 import LabModal from './LabModal';
 import AccessibilityPanel from './AccessibilityPanel';
@@ -66,7 +65,7 @@ const ResearchNetworkGraph: React.FC<ResearchNetworkGraphProps> = ({ className =
       const info = infos[0] || null;
       setLabInfo(info);
       if (info && Array.isArray(info.faculty) && info.faculty.length > 0) {
-        const faculty = await DynamoDBService.fetchResearchersByIds(info.faculty);
+        const faculty = info.faculty.map(id => researcherMap[id]).filter(Boolean);
         setLabFaculty(faculty);
       } else {
         setLabFaculty([]);
@@ -196,7 +195,16 @@ const ResearchNetworkGraph: React.FC<ResearchNetworkGraphProps> = ({ className =
   const handleResumeParsed = useCallback(async (text: string) => {
     try {
       setIsRecommending(true);
-      let recs = await bedrockRAGService.recommendResearchersFromResume(text);
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/recommendations/from-resume`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ resume_text: text }),
+      });
+      if (!response.ok) {
+        throw new Error("Failed to get recommendations");
+      }
+      const data = await response.json();
+      let recs = data.recommendations || [];
       if (!recs || recs.length === 0) {
         // Fallback: local similarity using tags and about fields
         if (graphData) {
@@ -245,16 +253,21 @@ const ResearchNetworkGraph: React.FC<ResearchNetworkGraphProps> = ({ className =
   }, []);
 
   useEffect(() => {
+    console.log("ResearchNetworkGraph: useEffect triggered, calling fetchData");
     const fetchData = async () => {
       try {
+        console.log("ResearchNetworkGraph: Setting loading=true");
         setLoading(true);
         setError(null);
-        const data = await DynamoDBService.fetchGraphData();
+        console.log("ResearchNetworkGraph: About to call fetchGraphData()");
+        const data = await fetchGraphData();
+        console.log("ResearchNetworkGraph: fetchGraphData() returned, setting graphData");
         setGraphData(data);
       } catch (err) {
-        console.error('Failed to fetch graph data:', err);
+        console.error('ResearchNetworkGraph: Failed to fetch graph data:', err);
         setError('Failed to load research network data. Please check your AWS credentials and try again.');
       } finally {
+        console.log("ResearchNetworkGraph: Setting loading=false");
         setLoading(false);
       }
     };

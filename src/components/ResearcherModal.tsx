@@ -4,9 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import { Mail, Phone, Globe, GraduationCap, Building2, User, FileText, Calendar, X, Tag, ExternalLink, Loader2 } from 'lucide-react';
-import { type Researcher, type Paper } from '../services/dynamodb';
-import { s3Service } from '../services/s3';
-import { DynamoDBService } from '../services/dynamodb';
+import { type Researcher, type Paper, fetchPaperLabId } from '../services/dynamodb';
 
 interface ResearcherModalProps {
   researcher: Researcher | null;
@@ -45,7 +43,7 @@ const ResearcherModal: React.FC<ResearcherModalProps> = ({
     
     try {
       // Get lab_id for the paper
-      const labId = await DynamoDBService.fetchPaperLabId(documentId);
+      const labId = await fetchPaperLabId(documentId);
       
       if (!labId) {
         console.error('No lab_id found for paper:', documentId);
@@ -54,7 +52,16 @@ const ResearcherModal: React.FC<ResearcherModalProps> = ({
       }
       
       // Generate presigned URL
-      const pdfUrl = await s3Service.getPresignedPdfUrl(labId, documentId);
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/pdf/url`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lab_id: labId, document_id: documentId }),
+      });
+      if (!response.ok) {
+        throw new Error("Failed to generate PDF URL");
+      }
+      const data = await response.json();
+      const pdfUrl = data.url;
       
       // Open PDF in new tab
       window.open(pdfUrl, '_blank');

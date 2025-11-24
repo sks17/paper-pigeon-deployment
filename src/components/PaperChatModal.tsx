@@ -5,8 +5,18 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { X, Send, Bot, User, FileText } from 'lucide-react';
-import { bedrockRAGService, type ChatMessage } from '../services/bedrock';
 import { type Paper } from '../services/dynamodb';
+
+interface ChatMessage {
+  id: string;
+  content: string;
+  isUser: boolean;
+  timestamp: Date;
+  citations?: Array<{
+    text: string;
+    source?: string;
+  }>;
+}
 
 interface PaperChatModalProps {
   paper: Paper | null;
@@ -63,17 +73,39 @@ const PaperChatModal: React.FC<PaperChatModalProps> = ({
     setIsLoading(true);
 
     try {
-      const response = await bedrockRAGService.retrieveAndGenerate(
-        inputValue.trim(),
-        paper.document_id
-      );
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/rag/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: inputValue.trim(), document_id: paper.document_id }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`RAG chat failed: ${response.status}`);
+      }
+
+      const ragResponse = await response.json();
+
+      // Format citations for display
+      const formattedCitations: Array<{ text: string; source?: string }> = [];
+      if (ragResponse.citations) {
+        ragResponse.citations.forEach((citation: any) => {
+          if (citation.retrievedReferences) {
+            citation.retrievedReferences.forEach((ref: any) => {
+              formattedCitations.push({
+                text: ref.content?.text || '',
+                source: ref.location?.s3Location?.uri || 'Unknown source',
+              });
+            });
+          }
+        });
+      }
 
       const botMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
-        content: response.answer,
+        content: ragResponse.answer,
         isUser: false,
         timestamp: new Date(),
-        citations: bedrockRAGService.formatCitations(response.citations),
+        citations: formattedCitations,
       };
 
       setMessages(prev => {
