@@ -4,5 +4,6 @@
       "source": "/api/(.*)",
       "destination": "/api/index.py"
     }
-  ]
+  ],
+  "ignoreCommand": "echo 'No ignore needed'"
 }
