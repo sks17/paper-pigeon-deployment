@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, request
-from services.bedrock_service import rag_recommend
+from backend.services.bedrock_service import rag_recommend
 
 recommendations_bp = Blueprint('recommendations', __name__)
 

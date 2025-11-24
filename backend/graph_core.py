@@ -3,7 +3,7 @@ Pure Python module for building graph data from DynamoDB.
 Structured to match the exact frontend TypeScript schema for nodes and links.
 """
 
-from services.dynamodb_service import (
+from backend.services.dynamodb_service import (
     fetch_researchers,
     fetch_paper_edges,
     fetch_advisor_edges,

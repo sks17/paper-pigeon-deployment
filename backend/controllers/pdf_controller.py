@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, request
-from services.s3_service import get_presigned_pdf_url
+from backend.services.s3_service import get_presigned_pdf_url
 
 pdf_bp = Blueprint('pdf', __name__)
 

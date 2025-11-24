@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, request
-from services.bedrock_service import rag_chat
+from backend.services.bedrock_service import rag_chat
 
 rag_bp = Blueprint("rag", __name__)
 
