@@ -2,17 +2,8 @@
 Main Flask application entry point.
 Cache-first API: serves prebuilt graph JSON instantly.
 """
-import sys
 import os
 import json
-
-# Add parent directory to path so backend can be imported as a package
-parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if parent_dir not in sys.path:
-    sys.path.insert(0, parent_dir)
-
-# Import backend package to trigger __init__.py and load environment variables
-import backend
 
 from flask import Flask, jsonify, request
 from flask_cors import CORS
@@ -25,8 +16,8 @@ app = Flask(__name__)
 # Enable CORS for localhost:5173 only
 CORS(app, origins=['http://localhost:5173'])
 
-# In-memory graph cache (loaded on startup)
-_graph_cache = {"nodes": [], "links": []}
+# In-memory graph cache (lazy-loaded on first request)
+_graph_cache = None
 
 
 def load_graph_cache():
@@ -69,24 +60,21 @@ def load_graph_cache():
     return False
 
 
-def save_graph_cache(graph_data):
-    """Save graph cache to disk."""
-    backend_dir = os.path.dirname(os.path.abspath(__file__))
-    cache_dir = os.path.join(backend_dir, "cache")
-    os.makedirs(cache_dir, exist_ok=True)
-    
-    cache_path = os.path.join(cache_dir, "graph_cache.json")
-    try:
-        with open(cache_path, 'w', encoding='utf-8') as f:
-            json.dump(graph_data, f, indent=2, default=str)
-        return True
-    except Exception as e:
-        print(f"[ERROR] Failed to save graph cache: {e}")
-        return False
-
-
-# Load cache on startup
-load_graph_cache()
+# def save_graph_cache(graph_data):
+#     """Save graph cache to disk."""
+#     # DISABLED: Vercel serverless filesystem is read-only
+#     backend_dir = os.path.dirname(os.path.abspath(__file__))
+#     cache_dir = os.path.join(backend_dir, "cache")
+#     os.makedirs(cache_dir, exist_ok=True)
+#     
+#     cache_path = os.path.join(cache_dir, "graph_cache.json")
+#     try:
+#         with open(cache_path, 'w', encoding='utf-8') as f:
+#             json.dump(graph_data, f, indent=2, default=str)
+#         return True
+#     except Exception as e:
+#         print(f"[ERROR] Failed to save graph cache: {e}")
+#         return False
 
 # Register blueprints
 app.register_blueprint(rag_bp, url_prefix='/api/rag')
@@ -100,6 +88,10 @@ def get_graph_data():
     Serve cached graph data instantly.
     Does NOT call DynamoDB.
     """
+    global _graph_cache
+    # Lazy load cache on first request
+    if _graph_cache is None:
+        load_graph_cache()
     return jsonify(_graph_cache)
 
 
@@ -107,45 +99,12 @@ def get_graph_data():
 def rebuild_cache():
     """
     Manually rebuild graph cache from DynamoDB.
-    Updates both disk cache and in-memory cache.
+    DISABLED: Cache writing disabled on Vercel (read-only filesystem).
     """
-    global _graph_cache
-    
-    try:
-        print("[REBUILD] Starting graph cache rebuild...")
-        from backend.graph_core import build_graph_data_pure
-        
-        # Build graph from DynamoDB
-        graph_data = build_graph_data_pure()
-        
-        # Update in-memory cache
-        _graph_cache = graph_data
-        
-        # Update disk cache
-        if save_graph_cache(graph_data):
-            nodes = graph_data.get("nodes", [])
-            links = graph_data.get("links", [])
-            print(f"[REBUILD] Cache rebuilt: {len(nodes)} nodes, {len(links)} links")
-            return jsonify({
-                "success": True,
-                "message": "Graph cache rebuilt successfully",
-                "nodes": len(nodes),
-                "links": len(links)
-            })
-        else:
-            return jsonify({
-                "success": False,
-                "message": "Graph rebuilt but failed to save to disk"
-            }), 500
-            
-    except Exception as e:
-        print(f"[REBUILD] Error: {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
+    return jsonify({
+        "ok": False,
+        "reason": "cache writing disabled on Vercel"
+    }), 503
 
 
 @app.route('/api/graph/paper-lab-id', methods=['POST'])
