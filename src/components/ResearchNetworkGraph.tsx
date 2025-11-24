@@ -428,7 +428,7 @@ const ResearchNetworkGraph: React.FC<ResearchNetworkGraphProps> = ({ className =
           {/* Logo */}
           <div className="mb-6">
             <img 
-              src="/favicon.jpeg" 
+              src="/favicon.png" 
               alt="Paper Pigeon" 
               className="w-16 h-16 mx-auto mb-4 opacity-90"
             />
