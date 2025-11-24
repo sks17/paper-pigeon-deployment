@@ -1,10 +1,9 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Button } from '@/components/ui/button';
-import { Mail, Phone, Globe, GraduationCap, Building2, User, FileText, Calendar, Tag, ExternalLink, Loader2 } from 'lucide-react';
-import { type Researcher, type Paper, fetchPaperLabId } from '../services/dynamodb';
+import { Mail, Phone, Globe, GraduationCap, Building2, User, Tag } from 'lucide-react';
+import { type Researcher, type Paper } from '../services/dynamodb';
 
 interface ResearcherProfilePanelProps {
   researcher: Researcher | null;
@@ -19,53 +18,9 @@ const ResearcherProfilePanel: React.FC<ResearcherProfilePanelProps> = ({
   isVisible,
   onMouseEnter,
   onMouseLeave,
-  onPaperChat,
+  onPaperChat: _onPaperChat,
 }) => {
-  const [loadingPdfs, setLoadingPdfs] = useState<Set<string>>(new Set());
-
   if (!researcher || !isVisible) return null;
-
-  const handlePdfClick = async (paper: Paper) => {
-    if (!paper.document_id) return;
-    
-    const documentId = paper.document_id;
-    setLoadingPdfs(prev => new Set(prev).add(documentId));
-    
-    try {
-      // Get lab_id for the paper
-      const labId = await fetchPaperLabId(documentId);
-      
-      if (!labId) {
-        console.error('No lab_id found for paper:', documentId);
-        alert('PDF not available - lab information not found');
-        return;
-      }
-      
-      // Generate presigned URL
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/pdf/url`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ lab_id: labId, document_id: documentId }),
-      });
-      if (!response.ok) {
-        throw new Error("Failed to generate PDF URL");
-      }
-      const data = await response.json();
-      const pdfUrl = data.url;
-      
-      // Open PDF in new tab
-      window.open(pdfUrl, '_blank');
-    } catch (error) {
-      console.error('Error opening PDF:', error);
-      alert('Failed to open PDF. Please try again.');
-    } finally {
-      setLoadingPdfs(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(documentId);
-        return newSet;
-      });
-    }
-  };
 
 
 
@@ -101,7 +56,7 @@ const ResearcherProfilePanel: React.FC<ResearcherProfilePanelProps> = ({
         <CardHeader className="pb-4">
           <div className="flex items-center space-x-3">
             <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-semibold text-lg">
-              {researcher.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+              {researcher.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
             </div>
             <div className="flex-1 min-w-0">
               <h3 className="font-semibold text-lg text-foreground truncate">
@@ -156,7 +111,7 @@ const ResearcherProfilePanel: React.FC<ResearcherProfilePanelProps> = ({
                 <span className="font-medium">Labs</span>
               </div>
               <div className="flex flex-wrap gap-1 ml-6">
-                {researcher.labs.map((lab, index) => (
+                {researcher.labs.map((lab: string, index: number) => (
                   <Badge key={index} variant="outline" className="text-xs">
                     {lab}
                   </Badge>
@@ -173,7 +128,7 @@ const ResearcherProfilePanel: React.FC<ResearcherProfilePanelProps> = ({
                 <span className="font-medium">Research Areas</span>
               </div>
               <div className="flex flex-wrap gap-1 ml-6">
-                {researcher.tags.map((tag, index) => (
+                {researcher.tags.map((tag: string, index: number) => (
                   <Badge key={index} variant="secondary" className="text-xs">
                     {tag}
                   </Badge>
@@ -191,7 +146,7 @@ const ResearcherProfilePanel: React.FC<ResearcherProfilePanelProps> = ({
               <div className="space-y-2">
                 <h4 className="text-sm font-medium text-muted-foreground">Contact</h4>
                 <div className="space-y-2">
-                  {researcher.contact_info.map((contact, index) => {
+                  {researcher.contact_info.map((contact: string, index: number) => {
                     const contactInfo = formatContactInfo(contact);
                     const Icon = contactInfo.icon;
                     return (

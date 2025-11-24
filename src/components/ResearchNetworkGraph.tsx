@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import ForceGraph3D from '3d-force-graph';
 import SpriteText from 'three-spritetext';
 import * as THREE from 'three';
-import { fetchGraphData, type GraphData, type Researcher, type Paper } from '../services/dynamodb';
+import { fetchGraphData, type GraphData, type Researcher, type Paper, type Node as GraphNode } from '../services/dynamodb';
 import ResearcherProfilePanel from './ResearcherProfilePanel';
 import ResearcherModal from './ResearcherModal';
 import SearchBar from './SearchBar';
@@ -64,8 +64,9 @@ const ResearchNetworkGraph: React.FC<ResearchNetworkGraphProps> = ({ className =
       const infos = await DynamoDBService.fetchLabInfos([labId]);
       const info = infos[0] || null;
       setLabInfo(info);
-      if (info && Array.isArray(info.faculty) && info.faculty.length > 0) {
-        const faculty = info.faculty.map(id => researcherMap[id]).filter(Boolean);
+      if (info && Array.isArray(info.faculty) && info.faculty.length > 0 && graphData) {
+        const researcherMap = new Map(graphData.nodes.filter((n: GraphNode) => n.type === 'researcher').map((n: GraphNode) => [n.id, n]));
+        const faculty = info.faculty.map((id: string) => researcherMap.get(id)).filter(Boolean) as Researcher[];
         setLabFaculty(faculty);
       } else {
         setLabFaculty([]);
@@ -75,7 +76,7 @@ const ResearchNetworkGraph: React.FC<ResearchNetworkGraphProps> = ({ className =
       setLabInfo(null);
       setLabFaculty([]);
     }
-  }, []);
+  }, [graphData]);
 
   // Debounced hover handler
   const handleNodeHover = useCallback((node: any) => {
@@ -185,9 +186,9 @@ const ResearchNetworkGraph: React.FC<ResearchNetworkGraphProps> = ({ className =
 
   const handleOpenResearcherById = useCallback((researcherId: string) => {
     if (!graphData) return;
-    const node = graphData.nodes.find(n => n.id === researcherId);
+    const node = graphData.nodes.find((n: GraphNode) => n.id === researcherId);
     if (node) {
-      setSelectedResearcher(node as any);
+      setSelectedResearcher(node as Researcher);
       setShowModal(true);
     }
   }, [graphData]);
@@ -210,10 +211,10 @@ const ResearchNetworkGraph: React.FC<ResearchNetworkGraphProps> = ({ className =
         if (graphData) {
           const lcResume = text.toLowerCase();
           const scored = graphData.nodes
-            .filter(n => n.type === 'researcher')
-            .map(n => {
-              const tags = (n.tags || []).join(' ').toLowerCase();
-              const about = (n.about || '').toLowerCase();
+            .filter((n: GraphNode) => n.type === 'researcher')
+            .map((n: GraphNode) => {
+              const tags = ((n as any).tags || []).join(' ').toLowerCase();
+              const about = ((n as any).about || '').toLowerCase();
               // simple Jaccard-like overlap on words
               const resumeWords = new Set(lcResume.split(/[^a-z0-9]+/).filter(Boolean));
               const textWords = new Set((tags + ' ' + about).split(/[^a-z0-9]+/).filter(Boolean));
@@ -225,7 +226,7 @@ const ResearchNetworkGraph: React.FC<ResearchNetworkGraphProps> = ({ className =
               const score = overlap / denom;
               return { name: n.name, score, rationale: undefined };
             })
-            .sort((a, b) => b.score - a.score)
+            .sort((a: { score: number }, b: { score: number }) => b.score - a.score)
             .slice(0, 10);
           recs = scored;
         } else {

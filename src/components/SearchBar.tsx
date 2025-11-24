@@ -3,7 +3,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Search, Building2, X, Bird, Plus } from 'lucide-react';
-import { type GraphData } from '../services/dynamodb';
+import { type GraphData, type Node as GraphNode } from '../services/dynamodb';
 import { Button } from '@/components/ui/button';
 import { parsePdf } from '@/services/pdf';
 
@@ -49,13 +49,13 @@ const SearchBar: React.FC<SearchBarProps> = ({
     const results: SearchResult[] = [];
 
     // Search through all nodes
-    graphData.nodes.forEach(node => {
+    graphData.nodes.forEach((node: GraphNode) => {
       const nodeName = node.name.toLowerCase();
       const matchesName = nodeName.includes(normalizedQuery);
-      const matchesLab = node.labs?.some(lab => 
+      const matchesLab = (node as any).labs?.some((lab: string) => 
         lab.toLowerCase().includes(normalizedQuery)
       ) || false;
-      const matchesTag = node.tags?.some(tag => 
+      const matchesTag = (node as any).tags?.some((tag: string) => 
         tag.toLowerCase().includes(normalizedQuery)
       ) || false;
 
@@ -108,13 +108,13 @@ const SearchBar: React.FC<SearchBarProps> = ({
     const normalizedQuery = query.toLowerCase().trim();
     const highlightedIds: string[] = [];
 
-    graphData.nodes.forEach(node => {
+    graphData.nodes.forEach((node: GraphNode) => {
       const nodeName = node.name.toLowerCase();
       const matchesName = nodeName.includes(normalizedQuery);
-      const matchesLab = node.labs?.some(lab => 
+      const matchesLab = (node as any).labs?.some((lab: string) => 
         lab.toLowerCase().includes(normalizedQuery)
       ) || false;
-      const matchesTag = node.tags?.some(tag => 
+      const matchesTag = (node as any).tags?.some((tag: string) => 
         tag.toLowerCase().includes(normalizedQuery)
       ) || false;
 
@@ -152,7 +152,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
 
   // Handle result selection
   const handleResultSelect = (result: SearchResult) => {
-    const node = graphData?.nodes.find(n => n.id === result.id);
+    const node = graphData?.nodes.find((n: GraphNode) => n.id === result.id);
     if (node) {
       onNodeSelect(node);
       setSearchQuery('');

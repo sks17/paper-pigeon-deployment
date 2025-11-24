@@ -91,8 +91,8 @@ const LabModal: React.FC<LabModalProps> = ({
                 <div className="flex flex-wrap gap-2">
                   {faculty.map(f => (
                     <button
-                      key={f.researcher_id}
-                      onClick={() => onClickResearcher(f.researcher_id)}
+                      key={f.id}
+                      onClick={() => onClickResearcher(f.id)}
                       className="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-full border hover:bg-muted transition-colors text-sm"
                     >
                       <span className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center">

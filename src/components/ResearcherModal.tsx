@@ -130,7 +130,7 @@ const ResearcherModal: React.FC<ResearcherModalProps> = ({
             
             <div className="flex items-center space-x-4 pr-12">
               <div className="w-16 h-16 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-semibold text-xl">
-                {researcher.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                {researcher.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">
                 <h2 className="font-bold text-2xl text-foreground">
@@ -219,7 +219,7 @@ const ResearcherModal: React.FC<ResearcherModalProps> = ({
                   <span className="font-semibold">Labs</span>
                 </div>
                 <div className="flex flex-wrap gap-2 ml-7">
-                  {researcher.labs.map((lab, index) => (
+                  {researcher.labs.map((lab: string, index: number) => (
                     <Badge key={index} variant="outline" className="text-sm">
                       {lab}
                     </Badge>
@@ -236,7 +236,7 @@ const ResearcherModal: React.FC<ResearcherModalProps> = ({
                   <span className="font-semibold">Research Areas</span>
                 </div>
                 <div className="flex flex-wrap gap-2 ml-7">
-                  {researcher.tags.map((tag, index) => (
+                  {researcher.tags.map((tag: string, index: number) => (
                     <Badge key={index} variant="secondary" className="text-sm">
                       {tag}
                     </Badge>
@@ -255,8 +255,8 @@ const ResearcherModal: React.FC<ResearcherModalProps> = ({
                 </div>
                 <div className="space-y-3 ml-7">
                   {researcher.papers
-                    .sort((a, b) => b.year - a.year)
-                    .map((paper, index) => (
+                    .sort((a: Paper, b: Paper) => b.year - a.year)
+                    .map((paper: Paper, index: number) => (
                       <div 
                         key={index} 
                         className={`text-sm border-l-2 border-muted pl-4 py-2 transition-all duration-200 ${onPaperChat ? 'cursor-pointer hover:bg-muted/50 hover:border-primary/50 hover:pl-6 rounded' : ''}`}
@@ -298,7 +298,7 @@ const ResearcherModal: React.FC<ResearcherModalProps> = ({
                 <div className="space-y-3">
                   <h4 className="text-base font-semibold text-muted-foreground">Contact</h4>
                   <div className="space-y-2">
-                    {researcher.contact_info.map((contact, index) => {
+                    {researcher.contact_info.map((contact: string, index: number) => {
                       const contactInfo = formatContactInfo(contact);
                       const Icon = contactInfo.icon;
                       return (
