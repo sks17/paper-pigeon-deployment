@@ -89,3 +89,4 @@ public
 tmp/
 temp/
 node_modules
+.vercel

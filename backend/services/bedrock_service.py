@@ -31,8 +31,8 @@ def rag_chat(query, document_id):
     """
     client = _get_bedrock_client()
     
-    knowledge_base_id = os.getenv("VITE_BEDROCK_KNOWLEDGE_BASE_ID")
-    data_source_id = os.getenv("VITE_BEDROCK_DATA_SOURCE_ID")
+    knowledge_base_id = os.getenv("BEDROCK_KNOWLEDGE_BASE_ID")
+    data_source_id = os.getenv("BEDROCK_DATA_SOURCE_ID")
     
     response = client.retrieve_and_generate(
         input={"text": query},
@@ -76,7 +76,7 @@ def rag_recommend(resume_text):
     """
     client = _get_bedrock_client()
     
-    knowledge_base_id_2 = os.getenv("VITE_BEDROCK_KNOWLEDGE_BASE_ID_2")
+    knowledge_base_id_2 = os.getenv("BEDROCK_KNOWLEDGE_BASE_ID_2")
     region = os.getenv("AWS_REGION")
     
     response = client.retrieve_and_generate(
