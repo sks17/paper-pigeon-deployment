@@ -36,23 +36,37 @@ def load_graph_cache():
     backend_dir = os.path.dirname(os.path.abspath(__file__))
     cache_path = os.path.join(backend_dir, "cache", "graph_cache.json")
     
+    # Try backend/cache/graph_cache.json first
     if os.path.exists(cache_path):
         try:
             with open(cache_path, 'r', encoding='utf-8') as f:
                 _graph_cache = json.load(f)
             nodes = _graph_cache.get("nodes", [])
             links = _graph_cache.get("links", [])
-            print(f"[OK] Graph cache loaded: {len(nodes)} nodes, {len(links)} links")
+            print(f"[OK] Graph cache loaded from backend/cache: {len(nodes)} nodes, {len(links)} links")
             return True
         except Exception as e:
-            print(f"[WARNING] Failed to load graph cache: {e}")
-            _graph_cache = {"nodes": [], "links": []}
-            return False
-    else:
-        print(f"[WARNING] Graph cache not found at {cache_path}")
-        print("  Run 'python backend/build_graph_cache.py' to generate cache")
-        _graph_cache = {"nodes": [], "links": []}
-        return False
+            print(f"[WARNING] Failed to load graph cache from backend/cache: {e}")
+    
+    # Fallback to public/graph_cache.json
+    public_path = os.path.join(os.path.dirname(__file__), "..", "public", "graph_cache.json")
+    public_path = os.path.normpath(public_path)
+    
+    if os.path.exists(public_path):
+        try:
+            with open(public_path, 'r', encoding='utf-8') as f:
+                _graph_cache = json.load(f)
+            nodes = _graph_cache.get("nodes", [])
+            links = _graph_cache.get("links", [])
+            print(f"[OK] Graph cache loaded from public/static: {len(nodes)} nodes, {len(links)} links")
+            return True
+        except Exception as e:
+            print(f"[WARNING] Failed to load graph cache from public/static: {e}")
+    
+    # Default to empty graph
+    print("[WARNING] Graph cache not found in backend/cache or public/static, using empty graph")
+    _graph_cache = {"nodes": [], "links": []}
+    return False
 
 
 def save_graph_cache(graph_data):
