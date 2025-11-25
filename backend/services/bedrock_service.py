@@ -88,14 +88,6 @@ def rag_chat(query, document_id):
         print(f"[RAG DIAG]   query is None: {query is None}")
         print(f"[RAG DIAG]   document_id is None: {document_id is None}")
     
-    # DIAGNOSTICS: Check Bedrock-specific environment variables
-    if os.getenv('NODE_ENV') != 'production':
-        print("[RAG DIAG] Checking Bedrock environment variables:")
-        bedrock_vars = ["BEDROCK_KNOWLEDGE_BASE_ID", "BEDROCK_DATA_SOURCE_ID"]
-        for var in bedrock_vars:
-            value = os.getenv(var)
-            exists = value is not None and value != ""
-            print(f"[RAG DIAG]   {var}: {'SET' if exists else 'MISSING'} (length: {len(value) if value else 0})")
     
     # Step 1: Get Bedrock client
     client_start = time.time()
@@ -113,35 +105,22 @@ def rag_chat(query, document_id):
     
     # Step 2: Get knowledge base configuration
     knowledge_base_id = _env("BEDROCK_KNOWLEDGE_BASE_ID", "VITE_BEDROCK_KNOWLEDGE_BASE_ID")
-    data_source_id = _env("BEDROCK_DATA_SOURCE_ID", "VITE_BEDROCK_DATA_SOURCE_ID")
-    
-    # DIAGNOSTICS: Validate configuration values
-    if os.getenv('NODE_ENV') != 'production':
-        print(f"[RAG DIAG] Knowledge base ID: {knowledge_base_id[:20] if knowledge_base_id else None}...")
-        print(f"[RAG DIAG] Data source ID: {data_source_id[:20] if data_source_id else None}...")
-        print(f"[RAG DIAG] knowledge_base_id is None: {knowledge_base_id is None}")
-        print(f"[RAG DIAG] data_source_id is None: {data_source_id is None}")
+    aws_region = _env("AWS_REGION", "VITE_AWS_REGION")
     
     if not knowledge_base_id:
-        error_msg = "BEDROCK_KNOWLEDGE_BASE_ID environment variable is not set"
-        if os.getenv('NODE_ENV') != 'production':
-            print(f"[RAG DIAG] ERROR: {error_msg}")
-        raise ValueError(error_msg)
+        raise ValueError("BEDROCK_KNOWLEDGE_BASE_ID environment variable is not set")
     
-    if not data_source_id:
-        error_msg = "BEDROCK_DATA_SOURCE_ID environment variable is not set"
-        if os.getenv('NODE_ENV') != 'production':
-            print(f"[RAG DIAG] ERROR: {error_msg}")
-        raise ValueError(error_msg)
+    if not aws_region:
+        raise ValueError("AWS_REGION environment variable is not set")
     
-    # Step 3: Build request payload
+    # Step 3: Build request payload (matches working rag_recommend structure)
     request_payload = {
         "input": {"text": query},
         "retrieveAndGenerateConfiguration": {
             "type": "KNOWLEDGE_BASE",
             "knowledgeBaseConfiguration": {
                 "knowledgeBaseId": knowledge_base_id,
-                "dataSourceIds": [data_source_id],
+                "modelArn": f"arn:aws:bedrock:{aws_region}::foundation-model/anthropic.claude-3-haiku-20240307-v1:0",
                 "retrievalConfiguration": {
                     "vectorSearchConfiguration": {
                         "filter": {
@@ -156,14 +135,6 @@ def rag_chat(query, document_id):
         }
     }
     
-    # DIAGNOSTICS: Log request payload structure
-    if os.getenv('NODE_ENV') != 'production':
-        print(f"[RAG DIAG] Request payload structure:")
-        print(f"[RAG DIAG]   input.text length: {len(request_payload['input']['text'])}")
-        print(f"[RAG DIAG]   knowledgeBaseId: {request_payload['retrieveAndGenerateConfiguration']['knowledgeBaseConfiguration']['knowledgeBaseId'][:20]}...")
-        print(f"[RAG DIAG]   dataSourceIds: {request_payload['retrieveAndGenerateConfiguration']['knowledgeBaseConfiguration']['dataSourceIds']}")
-        print(f"[RAG DIAG]   filter key: {request_payload['retrieveAndGenerateConfiguration']['knowledgeBaseConfiguration']['retrievalConfiguration']['vectorSearchConfiguration']['filter']['equals']['key']}")
-        print(f"[RAG DIAG]   filter value: {request_payload['retrieveAndGenerateConfiguration']['knowledgeBaseConfiguration']['retrievalConfiguration']['vectorSearchConfiguration']['filter']['equals']['value']}")
     
     # Step 4: Call Bedrock API
     api_start = time.time()
