@@ -2,21 +2,26 @@ import os
 import boto3
 from boto3.dynamodb.conditions import Attr
 
-# Diagnostic: Print environment variables before any boto3 operations
-print("ENV BEFORE DYNAMODB:", {k: os.getenv(k) for k in ["AWS_REGION", "AWS_ACCESS_KEY_ID"]})
-
 # In-memory cache for DynamoDB reads
 CACHE_RESEARCHERS = {}
 CACHE_PAPERS = {}
 CACHE_LIBRARY_ENTRIES = {}
 
 
+def _env(*names: str):
+    """Return the first non-empty environment variable from the list of names."""
+    for name in names:
+        value = os.getenv(name)
+        if value:
+            return value
+    return None
+
+
 def get_dynamodb():
     """
     Get DynamoDB resource. Called lazily to avoid AWS connections at import time.
     """
-    aws_region = os.getenv("AWS_REGION")
-    print("AWS_REGION detected:", aws_region)
+    aws_region = _env("AWS_REGION", "VITE_AWS_REGION")
     return boto3.resource(
         "dynamodb",
         region_name=aws_region

@@ -8,6 +8,15 @@ import time
 import traceback
 
 
+def _env(*names: str):
+    """Return the first non-empty environment variable from the list of names."""
+    for name in names:
+        value = os.getenv(name)
+        if value:
+            return value
+    return None
+
+
 def _get_bedrock_client():
     """
     Lazy-load Bedrock client to avoid AWS connections at import time.
@@ -22,9 +31,9 @@ def _get_bedrock_client():
             exists = value is not None and value != ""
             print(f"[RAG DIAG]   {var}: {'SET' if exists else 'MISSING'} (length: {len(value) if value else 0})")
     
-    aws_access_key = os.getenv("AWS_ACCESS_KEY_ID")
-    aws_secret_key = os.getenv("AWS_SECRET_ACCESS_KEY")
-    aws_region = os.getenv("AWS_REGION")
+    aws_access_key = _env("AWS_ACCESS_KEY_ID", "VITE_AWS_ACCESS_KEY_ID")
+    aws_secret_key = _env("AWS_SECRET_ACCESS_KEY", "VITE_AWS_SECRET_ACCESS_KEY")
+    aws_region = _env("AWS_REGION", "VITE_AWS_REGION")
     
     # DIAGNOSTICS: Validate env vars before client creation
     if os.getenv('NODE_ENV') != 'production':
@@ -103,8 +112,8 @@ def rag_chat(query, document_id):
         raise
     
     # Step 2: Get knowledge base configuration
-    knowledge_base_id = os.getenv("BEDROCK_KNOWLEDGE_BASE_ID")
-    data_source_id = os.getenv("BEDROCK_DATA_SOURCE_ID")
+    knowledge_base_id = _env("BEDROCK_KNOWLEDGE_BASE_ID", "VITE_BEDROCK_KNOWLEDGE_BASE_ID")
+    data_source_id = _env("BEDROCK_DATA_SOURCE_ID", "VITE_BEDROCK_DATA_SOURCE_ID")
     
     # DIAGNOSTICS: Validate configuration values
     if os.getenv('NODE_ENV') != 'production':
@@ -247,8 +256,8 @@ def rag_recommend(resume_text):
     """
     client = _get_bedrock_client()
     
-    knowledge_base_id_2 = os.getenv("BEDROCK_KNOWLEDGE_BASE_ID_2")
-    region = os.getenv("AWS_REGION")
+    knowledge_base_id_2 = _env("BEDROCK_KNOWLEDGE_BASE_ID_2", "VITE_BEDROCK_KNOWLEDGE_BASE_ID_2")
+    region = _env("AWS_REGION", "VITE_AWS_REGION")
     
     response = client.retrieve_and_generate(
         input={"text": resume_text},

@@ -1,631 +1,286 @@
-# Paper Pigeon - Complete Architecture Analysis
+## Paper Pigeon - Architecture & Deployment Overview
 
-**Analysis Date**: Current  
-**Purpose**: Deployment preparation for Vercel (static frontend + Python serverless backend)  
-**Deployment Target**: Vercel Serverless Functions (Python Runtime)
-
----
-
-## Table of Contents
-
-1. [Directory Map](#directory-map)
-2. [Backend Data Flow](#backend-data-flow)
-3. [Frontend Data Flow](#frontend-data-flow)
-4. [Environment Variables Inventory](#environment-variables-inventory)
-5. [AWS Data Sources](#aws-data-sources)
-6. [Safe Default Fallback Behavior](#safe-default-fallback-behavior)
-7. [Deployment Blockers](#deployment-blockers)
-8. [Essential vs. Optional Code](#essential-vs-optional-code)
+**Purpose**: Document the current architecture of Paper Pigeon for deployment and maintenance.  
+**Architecture**: React + Vite frontend, Flask backend on Vercel Python Serverless Functions.  
+**Data Plane**: Precomputed research graph served from a static JSON cache; AWS is used for RAG, recommendations, and PDF access.
 
 ---
 
-## Directory Map
+## 1. Directory Map (Conceptual)
 
-```
+```text
 paper-pigeon/
 ├── backend/                          # Flask Python backend
-│   ├── __init__.py                   # Loads .env via dotenv (production only)
-│   ├── app.py                        # Flask app entry point, cache-first API
-│   ├── graph_core.py                 # Pure Python graph builder (DynamoDB → JSON)
-│   ├── build_graph_cache.py          # Script to rebuild cache from DynamoDB
+│   ├── app.py                        # Flask app, graph endpoints, health check
+│   ├── graph_core.py                 # Graph builder (DynamoDB → JSON)
+│   ├── build_graph_cache.py          # Local script to rebuild graph cache
 │   ├── cache/
-│   │   └── graph_cache.json          # Local graph cache (loaded on startup)
-│   ├── controllers/                 # Flask blueprints
-│   │   ├── pdf_controller.py        # S3 presigned URL generation
-│   │   ├── rag_controller.py        # Bedrock RAG chat endpoint
-│   │   └── recommendations_controller.py  # Resume-based recommendations
-│   ├── services/                     # AWS service wrappers (black-box)
-│   │   ├── dynamodb_service.py       # DynamoDB queries (researchers, papers, edges)
-│   │   ├── s3_service.py            # S3 presigned URL generation
-│   │   └── bedrock_service.py       # Bedrock RetrieveAndGenerate calls
-│   └── utils/
-│       ├── cors.py                   # CORS configuration (localhost:5173)
-│       └── auth.py                   # Empty (no auth currently)
+│   │   └── graph_cache.json          # Optional local graph cache
+│   ├── controllers/                  # Flask blueprints
+│   │   ├── pdf_controller.py         # /api/pdf/url → S3 presigned URLs
+│   │   ├── rag_controller.py         # /api/rag/chat → Bedrock RAG chat
+│   │   └── recommendations_controller.py  # /api/recommendations/from-resume
+│   ├── services/                     # AWS service wrappers
+│   │   ├── dynamodb_service.py       # DynamoDB queries & caching
+│   │   ├── s3_service.py             # S3 presigned URL generation
+│   │   └── bedrock_service.py        # Bedrock RetrieveAndGenerate calls
+│   └── utils/                        # Misc utilities (currently minimal/unused)
+│
+├── api/
+│   └── index.py                      # Vercel Python serverless entry (imports backend_wrapper.app)
+├── backend_wrapper.py                # Thin wrapper exposing Flask app for Vercel
 │
 ├── src/                              # React + TypeScript frontend
 │   ├── main.tsx                      # React entry point
-│   ├── App.tsx                       # Root component (AccessibilityProvider wrapper)
+│   ├── App.tsx                       # Root component (AccessibilityProvider + graph)
 │   ├── components/
-│   │   ├── ResearchNetworkGraph.tsx  # Main 3D graph visualization
-│   │   ├── SearchBar.tsx             # Search + resume upload
-│   │   ├── ResearcherProfilePanel.tsx  # Hover panel
-│   │   ├── ResearcherModal.tsx      # Full researcher modal
-│   │   ├── PaperChatModal.tsx       # RAG chat interface
-│   │   ├── RecommendationsModal.tsx  # Resume recommendations
-│   │   ├── LabModal.tsx             # Lab information modal
-│   │   ├── AccessibilityPanel.tsx   # Accessibility settings
-│   │   └── ui/                       # shadcn/ui components
+│   │   ├── ResearchNetworkGraph.tsx  # Main 3D graph visualization & orchestration
+│   │   ├── SearchBar.tsx             # Search & resume upload
+│   │   ├── ResearcherProfilePanel.tsx# Hover profile panel
+│   │   ├── ResearcherModal.tsx       # Researcher detail modal
+│   │   ├── PaperChatModal.tsx        # RAG chat interface
+│   │   ├── RecommendationsModal.tsx  # Resume-based recommendations
+│   │   ├── LabModal.tsx              # Lab information modal
+│   │   ├── AccessibilityPanel.tsx    # Accessibility settings
+│   │   └── ui/                       # shadcn/ui primitives
 │   ├── services/
-│   │   ├── dynamodb.ts              # Frontend API calls (fetchGraphData, etc.)
-│   │   └── pdf.ts                   # Client-side PDF parsing (pdfjs-dist)
+│   │   ├── dynamodb.ts               # Frontend API client (no direct AWS)
+│   │   └── pdf.ts                    # Client-side PDF parsing (pdfjs-dist)
 │   ├── contexts/
-│   │   └── AccessibilityContext.tsx # Accessibility state management
+│   │   └── AccessibilityContext.tsx  # Accessibility state management
 │   └── lib/
-│       └── utils.ts                  # Utility functions (cn helper)
+│       └── utils.ts                  # Utility helpers
 │
 ├── public/
-│   └── graph_cache.json              # Static graph cache (for deployment)
+│   └── graph_cache.json              # Static graph cache shipped with frontend
 │
-├── package.json                      # Frontend dependencies
-├── vite.config.ts                    # Vite configuration
-├── tsconfig.json                     # TypeScript configuration
-└── components.json                   # shadcn/ui configuration
+├── vercel.json                       # Vercel rewrites for /api → api/index.py
+└── package.json / vite.config.ts / tsconfig*.json
 ```
 
 ---
 
-## Backend Data Flow
+## 2. Backend Architecture & Data Flow
 
-### Application Startup (`backend/app.py`)
+### 2.1 Flask App (`backend/app.py`)
 
-1. **Environment Loading** (`backend/__init__.py`):
-   - Loads `.env` file from `backend/.env` (if exists)
-   - Uses `dotenv.load_dotenv()` - **only for production**
-   - **No environment setup required for local testing** (boto3 uses default credentials)
+- **App setup**:
+  - Creates a `Flask` app and enables CORS (currently targeted at `http://localhost:5173` for local dev).
+  - Registers three blueprints:
+    - `/api/rag/*` → `rag_controller`
+    - `/api/recommendations/*` → `recommendations_controller`
+    - `/api/pdf/*` → `pdf_controller`
+  - Exposes `/api/graph/*` endpoints and `/health` directly on the app.
 
-2. **Graph Cache Loading** (`load_graph_cache()`):
-   - Reads `backend/cache/graph_cache.json` on startup
-   - Loads into in-memory `_graph_cache` variable
-   - Falls back to empty `{"nodes": [], "links": []}` if file missing
-   - Prints warning if cache not found
+- **Graph cache state**:
+  - Uses a module-level `_graph_cache` that is **lazily loaded** on first request to `/api/graph/data`.
 
-3. **Flask App Initialization**:
-   - CORS enabled for `http://localhost:5173` only
-   - Registers blueprints:
-     - `/api/rag/*` → `rag_controller.py`
-     - `/api/recommendations/*` → `recommendations_controller.py`
-     - `/api/pdf/*` → `pdf_controller.py`
+### 2.2 Graph Cache Loading
 
-### API Endpoints
+- **Function**: `load_graph_cache()`
+- **Behavior**:
+  - Attempts to load `backend/cache/graph_cache.json` first.
+  - If that fails or is absent, falls back to `public/graph_cache.json` (shared with the frontend build).
+  - If both are unavailable or invalid, logs a warning and sets `_graph_cache` to `{"nodes": [], "links": []}`.
+- **Runtime impact**:
+  - Once loaded, the cache is kept in memory for all subsequent requests in the same serverless instance.
+  - No DynamoDB calls are made on reads; all graph fetching is cache-first and read-only.
 
-#### 1. `/api/graph/data` (GET)
-- **Purpose**: Serve cached graph data instantly
-- **Data Source**: In-memory `_graph_cache` (loaded from `backend/cache/graph_cache.json`)
-- **AWS Calls**: **NONE** (cache-first design)
-- **Response**: `{"nodes": [...], "links": [...]}`
-- **Fallback**: Returns empty graph if cache not loaded
+### 2.3 Core API Endpoints
 
-#### 2. `/api/graph/rebuild-cache` (POST)
-- **Purpose**: Manually rebuild cache from DynamoDB
-- **Data Source**: DynamoDB (via `graph_core.build_graph_data_pure()`)
-- **AWS Calls**: 
-  - `dynamodb_service.fetch_researchers()`
-  - `dynamodb_service.fetch_paper_edges()`
-  - `dynamodb_service.fetch_advisor_edges()`
-  - `dynamodb_service.fetch_library_entries(researcher_id)` (per researcher)
-  - `dynamodb_service.fetch_papers(document_ids)` (batch)
-  - `dynamodb_service.fetch_descriptions(researcher_ids)` (batch)
-  - `dynamodb_service.fetch_metrics(researcher_ids)` (batch)
-- **Process**:
-  1. Calls `build_graph_data_pure()` → queries all DynamoDB tables
-  2. Updates in-memory `_graph_cache`
-  3. Saves to `backend/cache/graph_cache.json`
-- **Response**: `{"success": true, "nodes": N, "links": M}`
+- **`GET /api/graph/data`**
+  - **Purpose**: Serve the precomputed research network graph.
+  - **Source**: In-memory `_graph_cache`, backed by the static JSON file(s) described above.
+  - **Notes**: If the cache cannot be loaded, returns an empty graph structure.
 
-#### 3. `/api/graph/paper-lab-id` (POST)
-- **Purpose**: Get `lab_id` for a paper document
-- **Data Source**: DynamoDB `papers` table
-- **AWS Calls**: `dynamodb_service.fetch_papers([document_id])`
-- **Request**: `{"document_id": "..."}`
-- **Response**: `{"lab_id": "..."}` or `{"lab_id": null}`
+- **`POST /api/graph/rebuild-cache`**
+  - **Purpose**: Rebuild the graph cache from DynamoDB.
+  - **Current behavior**: Disabled on Vercel – always returns HTTP 503 with a message explaining that cache writing is not supported on the read-only filesystem.
 
-#### 4. `/api/rag/chat` (POST)
-- **Purpose**: RAG chat about a specific paper
-- **Data Source**: AWS Bedrock Knowledge Base
-- **AWS Calls**: `bedrock_service.rag_chat(query, document_id)`
-  - Uses `bedrock-agent-runtime.retrieve_and_generate()`
-  - Knowledge Base: `VITE_BEDROCK_KNOWLEDGE_BASE_ID`
-  - Data Source: `VITE_BEDROCK_DATA_SOURCE_ID`
-  - Filter: `document_id` equals provided value
-- **Request**: `{"query": "...", "document_id": "..."}`
-- **Response**: `{"answer": "...", "citations": [...]}`
+- **`POST /api/graph/paper-lab-id`**
+  - **Purpose**: Resolve a paper’s `document_id` to its `lab_id`.
+  - **Flow**: Validates `document_id`, calls `dynamodb_service.fetch_papers([document_id])`, and returns the `lab_id` from the first result (or `null`).
 
-#### 5. `/api/recommendations/from-resume` (POST)
-- **Purpose**: Recommend researchers based on resume text
-- **Data Source**: AWS Bedrock Knowledge Base (secondary)
-- **AWS Calls**: `bedrock_service.rag_recommend(resume_text)`
-  - Uses `bedrock-agent-runtime.retrieve_and_generate()`
-  - Knowledge Base: `VITE_BEDROCK_KNOWLEDGE_BASE_ID_2`
-  - Model: `meta.llama3-1-70b-instruct-v1:0` (hardcoded)
-  - Returns JSON with recommendations array
-- **Request**: `{"resume_text": "..."}`
-- **Response**: `{"recommendations": [{"name": "...", "score": 0.9, "rationale": "..."}]}`
+- **`POST /api/rag/chat`**
+  - **Controller**: `backend/controllers/rag_controller.py`
+  - **Purpose**: Paper-specific retrieval-augmented chat.
+  - **Flow**:
+    - Validates JSON body with `query` and `document_id`.
+    - Calls `bedrock_service.rag_chat(query, document_id)`.
+    - Returns `{ "answer": string, "citations": [...] }`.
+  - **Diagnostics**: Logs payload summary, timings, and errors when `NODE_ENV != 'production'`.
 
-#### 6. `/api/pdf/url` (POST)
-- **Purpose**: Generate presigned S3 URL for PDF document
-- **Data Source**: AWS S3
-- **AWS Calls**: `s3_service.get_presigned_pdf_url(lab_id, document_id)`
-  - Uses `boto3.client("s3").generate_presigned_url()`
-  - Bucket: `S3_BUCKET_NAME` env var
-  - Key: `{lab_id}/{document_id}.pdf`
-  - Expires: 3600 seconds (1 hour)
-- **Request**: `{"lab_id": "...", "document_id": "..."}`
-- **Response**: `{"url": "https://s3.amazonaws.com/..."}`
+- **`POST /api/recommendations/from-resume`**
+  - **Controller**: `backend/controllers/recommendations_controller.py`
+  - **Purpose**: Recommend researchers from resume text.
+  - **Flow**:
+    - Validates `resume_text` in the JSON body.
+    - Calls `bedrock_service.rag_recommend(resume_text)` and returns its `"recommendations"`.
 
-### Graph Building Process (`backend/graph_core.py`)
+- **`POST /api/pdf/url`**
+  - **Controller**: `backend/controllers/pdf_controller.py`
+  - **Purpose**: Provide a presigned S3 URL for a given lab and document ID.
+  - **Flow**:
+    - Validates `lab_id` and `document_id`.
+    - Calls `s3_service.get_presigned_pdf_url(lab_id, document_id)`.
+    - Returns `{ "url": "<presigned-url>" }`.
 
-**Function**: `build_graph_data_pure()`
+- **`GET /health`**
+  - Simple health check returning `{ "status": "ok" }`.
 
-**Steps**:
-1. Fetch all researchers from `researchers` table
-2. Fetch all paper edges from `paper-edges` table
-3. Fetch all advisor edges from `advisor_edges` table
-4. Batch fetch descriptions from `descriptions` table
-5. Batch fetch metrics from `metrics` table
-6. For each researcher:
-   - Fetch library entries (researcher → papers mapping)
-   - Batch fetch papers for those document IDs
-   - Extract tags from papers
-   - Build researcher node with all metadata
-7. Build lab nodes (static list of 24 labs)
-8. Build links:
-   - Paper edges (researcher ↔ researcher)
-   - Advisor edges (advisee → advisor)
-   - Researcher-lab edges (researcher → lab)
-9. Return `{"nodes": [...], "links": [...]}`
+### 2.4 AWS Service Layer
 
-**DynamoDB Tables Used**:
-- `researchers` (scan)
-- `papers` (batch get)
-- `paper-edges` (scan)
-- `advisor_edges` (scan)
-- `library` (scan with filter)
-- `descriptions` (batch get)
-- `metrics` (batch get)
-- `lab-info` (batch get, used by frontend only)
+- **DynamoDB (`backend/services/dynamodb_service.py`)**:
+  - Lazy `boto3.resource("dynamodb", region_name=AWS_REGION)` via `get_dynamodb()`.
+  - In-memory caches for researchers, papers, and library entries.
+  - High-level helpers:
+    - `fetch_researchers()`, `fetch_paper_edges()`, `fetch_advisor_edges()`
+    - `fetch_library_entries(researcher_id)`
+    - `_batch_get(table_name, key_name, key_values)`
+    - `fetch_papers(document_ids)`, `fetch_descriptions(researcher_ids)`, `fetch_metrics(researcher_ids)`
+    - `fetch_lab_info(lab_ids)` for lab metadata.
+
+- **S3 (`backend/services/s3_service.py`)**:
+  - Creates a client using `AWS_REGION`.
+  - Uses `S3_BUCKET_NAME` and key pattern `{lab_id}/{document_id}.pdf` to generate presigned URLs (1 hour validity).
+
+- **Bedrock (`backend/services/bedrock_service.py`)**:
+  - `_get_bedrock_client()` builds a `bedrock-agent-runtime` client using `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `AWS_REGION` (lazy, with diagnostics in non-production).
+  - `rag_chat(query, document_id)`:
+    - Uses `BEDROCK_KNOWLEDGE_BASE_ID` and `BEDROCK_DATA_SOURCE_ID`.
+    - Calls `retrieve_and_generate` with a filter on `document_id` and returns structured `{"answer", "citations"}`.
+  - `rag_recommend(resume_text)`:
+    - Uses `BEDROCK_KNOWLEDGE_BASE_ID_2` and a fixed model ARN derived from `AWS_REGION`.
+    - Expects JSON output containing `"recommendations"`; falls back to an empty list if parsing fails.
+
+### 2.5 Graph Construction (`backend/graph_core.py`)
+
+- **Function**: `build_graph_data_pure()`
+- **Responsibilities**:
+  - Fetch researchers, paper edges, advisor edges, descriptions, and metrics from DynamoDB.
+  - For each researcher:
+    - Fetch library entries → derive document IDs.
+    - Batch fetch papers and normalize them to `{title, year, document_id, tags}`.
+    - Aggregate tags and attach `about` and `influence` fields.
+  - Add static lab nodes from a hardcoded list, matching frontend expectations.
+  - Build links:
+    - `type: "paper"` (researcher–researcher).
+    - `type: "advisor"` (advisee–advisor).
+    - `type: "researcher_lab"` (researcher–lab).
+  - Return `{"nodes": [...], "links": [...]}` consistent with the frontend’s `GraphData` type.
 
 ---
 
-## Frontend Data Flow
+## 3. Frontend Architecture & Data Flow
 
-### Application Initialization (`src/main.tsx` → `src/App.tsx`)
+### 3.1 App Bootstrap
 
-1. **React Bootstrap**:
-   - `main.tsx` renders `App` component
-   - `App.tsx` wraps `ResearchNetworkGraph` with `AccessibilityProvider`
+- `src/main.tsx` mounts `App` into the DOM.
+- `src/App.tsx` wraps the app in `AccessibilityProvider` and renders `ResearchNetworkGraph` full-screen.
 
-2. **Graph Data Loading** (`ResearchNetworkGraph.tsx`):
-   - On mount, calls `fetchGraphData()` from `services/dynamodb.ts`
-   - Fetches from `${VITE_API_URL}/api/graph/data`
-   - Sets `graphData` state (or shows error if fetch fails)
-   - **No direct AWS calls** - all via backend API
+### 3.2 Graph Visualization (`ResearchNetworkGraph.tsx`)
 
-### Component Data Flow
+- **Data loading**:
+  - On mount, calls `fetchGraphData()` from `src/services/dynamodb.ts`.
+  - `fetchGraphData()` performs `GET ${import.meta.env.VITE_API_URL}/api/graph/data` and logs basic diagnostics.
 
-#### 1. Graph Visualization (`ResearchNetworkGraph.tsx`)
-- **Initial Load**: `fetchGraphData()` → `/api/graph/data` → displays 3D graph
-- **Node Hover**: Shows `ResearcherProfilePanel` with researcher info (from graph data)
-- **Node Click**: Opens `ResearcherModal` or `LabModal`
-- **Search Highlighting**: Filters nodes client-side, highlights matching nodes
+- **Rendering**:
+  - Uses `3d-force-graph`, `three`, and `three-spritetext` to render a 3D network.
+  - Distinguishes labs and researchers with different geometries/colors and supports highlight effects.
 
-#### 2. Search & Recommendations (`SearchBar.tsx`)
-- **Search**: Client-side filtering on `graphData.nodes` (name, labs, tags)
-- **Resume Upload**: 
-  1. Client-side PDF parsing (`pdf.ts` using `pdfjs-dist`)
-  2. Extracts text from PDF
-  3. Calls `/api/recommendations/from-resume` with resume text
-  4. Opens `RecommendationsModal` with results
-  5. **Fallback**: If API fails, uses local similarity matching (Jaccard-like on tags/about)
+- **Interactions**:
+  - Hovering researcher nodes shows `ResearcherProfilePanel`.
+  - Clicking researcher nodes opens `ResearcherModal`; clicking lab nodes opens `LabModal` and triggers lab info loading.
+  - Integrates accessibility settings (high contrast, colorblind mode, reduced motion) from `AccessibilityContext` and toggles `AccessibilityPanel` from a floating button.
 
-#### 3. Researcher Profile (`ResearcherModal.tsx`, `ResearcherProfilePanel.tsx`)
-- **Data Source**: All from `graphData` (loaded on mount)
-- **PDF Access**: 
-  - User clicks paper → calls `/api/pdf/url` with `lab_id` and `document_id`
-  - Gets presigned S3 URL → opens in new tab
-- **Paper Chat**: Opens `PaperChatModal` with selected paper
+### 3.3 Search, Resume Upload, and Recommendations
 
-#### 4. Paper Chat (`PaperChatModal.tsx`)
-- **User Input**: Question about paper
-- **API Call**: `/api/rag/chat` with `query` and `document_id`
-- **Response**: Displays answer + citations from Bedrock
+- **SearchBar.tsx**:
+  - Consumes `graphData` to perform client-side filtering by name, labs, and tags.
+  - Emits callbacks for node selection, highlighting, and resume text parsing.
 
-#### 5. Lab Modal (`LabModal.tsx`)
-- **Data Source**: 
-  - Lab info from `graphData.nodes` (lab nodes)
-  - Additional info: Calls `DynamoDBService.fetchLabInfos([labId])` (frontend service, but should use backend)
-  - **Note**: Currently uses frontend DynamoDB service (needs migration to backend API)
+- **Resume → recommendations flow**:
+  - `parsePdf(file)` in `src/services/pdf.ts` uses `pdfjs-dist` to extract text from uploaded resumes.
+  - `handleResumeParsed(text)` in `ResearchNetworkGraph`:
+    - Calls `POST ${VITE_API_URL}/api/recommendations/from-resume` with `{ resume_text: text }`.
+    - If the backend returns no recommendations, falls back to a local similarity heuristic over researcher tags and `about` fields to compute scores.
+  - Results are displayed in `RecommendationsModal`, with navigation hooks into the graph.
 
-### Frontend API Calls Summary
+### 3.4 Researcher Details, PDFs, and Chat
 
-All frontend API calls use `import.meta.env.VITE_API_URL`:
+- **ResearcherProfilePanel.tsx & ResearcherModal.tsx**:
+  - Display researcher metadata, labs, influence, and associated papers from `graphData`.
+  - Trigger `onPaperChat(paper)` to open `PaperChatModal`.
 
-1. **Graph Data**: `GET ${VITE_API_URL}/api/graph/data`
-2. **Paper Lab ID**: `POST ${VITE_API_URL}/api/graph/paper-lab-id`
-3. **RAG Chat**: `POST ${VITE_API_URL}/api/rag/chat`
-4. **Recommendations**: `POST ${VITE_API_URL}/api/recommendations/from-resume`
-5. **PDF URL**: `POST ${VITE_API_URL}/api/pdf/url`
+- **PaperChatModal.tsx**:
+  - Sends `POST ${VITE_API_URL}/api/rag/chat` with `{ query, document_id }`.
+  - Renders the returned `"answer"` and `"citations"`.
 
-**No direct AWS SDK calls in frontend** (all via backend API).
+- **LabModal.tsx**:
+  - Opens for lab nodes or search results.
+  - Dynamically imports `DynamoDBService` from `src/services/dynamodb.ts` and calls `fetchLabInfos` (currently a stub returning `[]`), while also mapping faculty IDs in the cached graph to researcher nodes.
 
----
+- **PDF access**:
+  - When a paper is selected, components call `POST ${VITE_API_URL}/api/pdf/url` with `{ lab_id, document_id }`.
+  - The returned presigned URL is opened in a new tab for PDF viewing.
 
-## Environment Variables Inventory
+### 3.5 Frontend API Client (`src/services/dynamodb.ts`)
 
-### Backend Environment Variables (Python `os.getenv()`)
-
-#### Required for AWS Services:
-- `AWS_REGION` - AWS region (e.g., `us-west-2`)
-  - Used by: `dynamodb_service.py`, `s3_service.py`, `bedrock_service.py`
-  - **Fallback**: None (will fail if missing)
-
-- `AWS_ACCESS_KEY_ID` - AWS access key
-  - Used by: `bedrock_service.py` (explicit credentials)
-  - **Note**: `dynamodb_service.py` and `s3_service.py` use boto3 default credentials (no explicit key)
-  - **Fallback**: boto3 will use default credential chain (IAM role, ~/.aws/credentials, etc.)
-
-- `AWS_SECRET_ACCESS_KEY` - AWS secret key
-  - Used by: `bedrock_service.py` (explicit credentials)
-  - **Fallback**: boto3 will use default credential chain
-
-- `S3_BUCKET_NAME` - S3 bucket for PDFs
-  - Used by: `s3_service.py` (presigned URL generation)
-  - **Fallback**: None (will fail if missing)
-
-- `VITE_BEDROCK_KNOWLEDGE_BASE_ID` - Primary Bedrock KB for paper chat
-  - Used by: `bedrock_service.py` (`rag_chat()`)
-  - **Fallback**: None (will fail if missing)
-
-- `VITE_BEDROCK_DATA_SOURCE_ID` - Primary Bedrock data source
-  - Used by: `bedrock_service.py` (`rag_chat()`)
-  - **Fallback**: None (will fail if missing)
-
-- `VITE_BEDROCK_KNOWLEDGE_BASE_ID_2` - Secondary Bedrock KB for recommendations
-  - Used by: `bedrock_service.py` (`rag_recommend()`)
-  - **Fallback**: None (will fail if missing)
-
-#### Optional:
-- `VITE_BEDROCK_DATA_SOURCE_ID_2` - Secondary Bedrock data source (not currently used)
-- `VITE_BEDROCK_MODEL_ID` - Bedrock model (hardcoded to `meta.llama3-1-70b-instruct-v1:0`)
-
-### Frontend Environment Variables (`import.meta.env`)
-
-#### Required:
-- `VITE_API_URL` - Backend API base URL
-  - Used by: All API calls in `services/dynamodb.ts`, `PaperChatModal.tsx`, `ResearcherModal.tsx`, `ResearcherProfilePanel.tsx`, `ResearchNetworkGraph.tsx`
-  - **Examples**: 
-    - Dev: `http://localhost:5000`
-    - Prod: `https://api.vercel.app` (or custom domain)
-  - **Fallback**: None (will fail if missing - fetch will error)
-
-### Environment Variable Loading
-
-**Backend** (`backend/__init__.py`):
-- Loads `.env` from `backend/.env` using `dotenv.load_dotenv()`
-- **Only loads if file exists** (no error if missing)
-- **For production**: Should use Vercel environment variables (not `.env` file)
-
-**Frontend** (`vite.config.ts`):
-- Vite automatically exposes `VITE_*` variables via `import.meta.env`
-- Variables must be prefixed with `VITE_` to be accessible
-- **Build-time**: Variables are embedded in bundle
-- **Runtime**: Cannot change after build (must rebuild)
+- Defines `Paper`, `Researcher`, `Node`, `Link`, and `GraphData` to mirror the backend shape.
+- Implements:
+  - `fetchGraphData()` → `GET /api/graph/data`.
+  - `fetchPaperLabId(documentId)` → `POST /api/graph/paper-lab-id`.
+  - `DynamoDBService.fetchLabInfos()` → stub returning an empty array, intended to be backed by a future backend endpoint.
 
 ---
 
-## AWS Data Sources
+## 4. Environment & Configuration
 
-### DynamoDB Tables
+### 4.1 Backend Environment Variables (`os.getenv`)
 
-1. **`researchers`**
-   - **Usage**: Fetched in `graph_core.py` → `build_graph_data_pure()`
-   - **Fields**: `researcher_id`, `name`, `advisor`, `contact_info[]`, `labs[]`, `standing`, `tags[]`, `influence`, `about`
-   - **Access Pattern**: Full table scan (cached in memory)
+- **AWS & Bedrock**:
+  - `AWS_REGION` – required by DynamoDB, S3, and Bedrock clients.
+  - `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` – used explicitly for the Bedrock client.
+  - `BEDROCK_KNOWLEDGE_BASE_ID`, `BEDROCK_DATA_SOURCE_ID` – primary knowledge base and data source for paper chat.
+  - `BEDROCK_KNOWLEDGE_BASE_ID_2` – secondary knowledge base for resume recommendations.
 
-2. **`papers`**
-   - **Usage**: Batch fetched by `document_id` in `graph_core.py`
-   - **Fields**: `document_id`, `title`, `year`, `tags[]`, `lab_id`
-   - **Access Pattern**: Batch get (100 items max per call)
+- **S3**:
+  - `S3_BUCKET_NAME` – bucket containing PDFs at `{lab_id}/{document_id}.pdf`.
 
-3. **`paper-edges`**
-   - **Usage**: Fetched in `graph_core.py` → builds paper collaboration links
-   - **Fields**: `researcher_one_id`, `researcher_two_id`
-   - **Access Pattern**: Full table scan
+All backend configuration is expected to be supplied via Vercel environment variables; there is no `.env` loading at import time in the production path.
 
-4. **`advisor_edges`**
-   - **Usage**: Fetched in `graph_core.py` → builds advisor relationships
-   - **Fields**: `advisee_id`, `advisor_id`
-   - **Access Pattern**: Full table scan
+### 4.2 Frontend Environment Variables (`import.meta.env`)
 
-5. **`library`**
-   - **Usage**: Fetched per researcher in `graph_core.py` → maps researchers to papers
-   - **Fields**: `researcher_id`, `document_id`
-   - **Access Pattern**: Scan with filter (per researcher)
-
-6. **`descriptions`**
-   - **Usage**: Batch fetched in `graph_core.py` → adds `about` field to researcher nodes
-   - **Fields**: `researcher_id`, `about`
-   - **Access Pattern**: Batch get
-
-7. **`metrics`**
-   - **Usage**: Batch fetched in `graph_core.py` → adds `influence` score to researcher nodes
-   - **Fields**: `researcher_id`, `influence`
-   - **Access Pattern**: Batch get
-
-8. **`lab-info`**
-   - **Usage**: Fetched by frontend (via `DynamoDBService.fetchLabInfos()` - **needs backend migration**)
-   - **Fields**: `lab_id`, `description`, `faculty[]`
-   - **Access Pattern**: Batch get
-
-### AWS S3
-
-- **Bucket**: `S3_BUCKET_NAME` environment variable
-- **Structure**: `{lab_id}/{document_id}.pdf`
-- **Usage**: Generate presigned URLs for PDF viewing (1-hour expiration)
-- **Access**: Via `s3_service.get_presigned_pdf_url()`
-
-### AWS Bedrock
-
-1. **Primary Knowledge Base** (`VITE_BEDROCK_KNOWLEDGE_BASE_ID`):
-   - **Usage**: Paper chat RAG (`rag_chat()`)
-   - **Data Source**: `VITE_BEDROCK_DATA_SOURCE_ID`
-   - **Filter**: By `document_id` (paper-specific queries)
-
-2. **Secondary Knowledge Base** (`VITE_BEDROCK_KNOWLEDGE_BASE_ID_2`):
-   - **Usage**: Resume-based recommendations (`rag_recommend()`)
-   - **Model**: `meta.llama3-1-70b-instruct-v1:0` (hardcoded)
-   - **Retrieval**: Hybrid search, 25 results
+- `VITE_API_URL` – base URL for all backend requests (e.g., `https://<project>.vercel.app`).
+  - Used across `src/services/dynamodb.ts` and components that call `/api/*` endpoints.
+  - Must be defined at build time; changing it requires rebuilding the frontend.
 
 ---
 
-## Safe Default Fallback Behavior
+## 5. Deployment Topology on Vercel
 
-### Current Behavior (No Fallbacks)
+- **Static frontend**:
+  - Vite builds the React app into static assets.
+  - Vercel serves these from the project root, including `public/graph_cache.json`.
 
-**Backend**:
-- Graph cache: Returns empty `{"nodes": [], "links": []}` if cache file missing
-- DynamoDB calls: Will raise exceptions if credentials missing
-- Bedrock calls: Will raise exceptions if credentials/KB IDs missing
-- S3 calls: Will raise exceptions if bucket name missing
+- **Python backend**:
+  - `api/index.py` is the Vercel serverless entrypoint; it imports `backend_wrapper.app`.
+  - `backend_wrapper.py` simply re-exports the Flask `app` from `backend.app`.
+  - `vercel.json` rewrites all `/api/(.*)` requests to `api/index.py`, which then routes via Flask.
 
-**Frontend**:
-- API calls: Will fail with network errors if `VITE_API_URL` missing
-- Graph data: Shows error message if fetch fails
-
-### Recommended Safe Defaults for Deployment
-
-#### 1. Graph Data Endpoint (`/api/graph/data`)
-
-**Current**: Returns empty graph if cache missing  
-**Recommended**: 
-- Try to load `backend/cache/graph_cache.json`
-- If missing, try to load `public/graph_cache.json` (static file)
-- If both missing, return empty graph with warning log
-- **No DynamoDB fallback** (too slow for production)
-
-#### 2. RAG Chat Endpoint (`/api/rag/chat`)
-
-**Current**: Raises exception if Bedrock credentials missing  
-**Recommended**:
-- Check if `VITE_BEDROCK_KNOWLEDGE_BASE_ID` is set
-- If missing, return: `{"answer": "RAG service is not configured. Please contact the administrator.", "citations": []}`
-- Log warning (don't crash)
-
-#### 3. Recommendations Endpoint (`/api/recommendations/from-resume`)
-
-**Current**: Raises exception if Bedrock credentials missing  
-**Recommended**:
-- Check if `VITE_BEDROCK_KNOWLEDGE_BASE_ID_2` is set
-- If missing, return: `{"recommendations": []}` (frontend will use local similarity fallback)
-- Log warning (don't crash)
-
-#### 4. PDF URL Endpoint (`/api/pdf/url`)
-
-**Current**: Raises exception if S3 bucket missing  
-**Recommended**:
-- Check if `S3_BUCKET_NAME` is set
-- If missing, return: `{"error": "PDF service is not configured"}` with 503 status
-- Log warning (don't crash)
-
-#### 5. Paper Lab ID Endpoint (`/api/graph/paper-lab-id`)
-
-**Current**: Raises exception if DynamoDB credentials missing  
-**Recommended**:
-- Check if `AWS_REGION` is set
-- If missing, return: `{"lab_id": null}` (graceful degradation)
-- Log warning (don't crash)
-
-#### 6. Rebuild Cache Endpoint (`/api/graph/rebuild-cache`)
-
-**Current**: Raises exception if DynamoDB credentials missing  
-**Recommended**:
-- Check if `AWS_REGION` is set
-- If missing, return: `{"success": false, "error": "DynamoDB not configured"}` with 503 status
-- Log warning (don't crash)
-
-#### 7. Frontend API URL (`VITE_API_URL`)
-
-**Current**: Fetch fails if missing  
-**Recommended**:
-- Build-time check: Warn if `VITE_API_URL` is undefined
-- Runtime: Try relative URL fallback (`/api/...`) if `VITE_API_URL` is empty
-- **Note**: Vite requires `VITE_*` prefix, so this must be set at build time
+This yields a clean split: the **frontend** handles visualization and UX, while the **backend** handles graph serving, AWS integration, and long-running work as serverless functions.
 
 ---
 
-## Deployment Blockers
+## 6. Feature Snapshot & Readiness
 
-### Critical Blockers (Must Fix)
+- **Graph serving**: Precomputed graph served via `/api/graph/data` with lazy in-memory caching and static-file fallback; no DynamoDB reads on user requests.
+- **RAG chat**: `/api/rag/chat` wired to Bedrock using environment-driven configuration and rich diagnostics outside production.
+- **Recommendations**: `/api/recommendations/from-resume` plus a robust frontend fallback when Bedrock returns no usable data.
+- **PDF access**: `/api/pdf/url` provides time-limited S3 URLs keyed by lab and document.
+- **VR**: All VR-related code and dependencies have been removed.
+- **Imports & paths**: Python imports consistently use `backend.*` to align with Vercel’s module resolution.
 
-1. **CORS Configuration** (`backend/app.py:26`)
-   - **Issue**: Hardcoded to `http://localhost:5173` only
-   - **Impact**: Production requests will be blocked
-   - **Fix**: Use environment variable or allow all origins in production
-   - **Location**: `backend/app.py`, `backend/utils/cors.py`
+Overall, Paper Pigeon is structured as a **Vite-powered static frontend** talking to a **Flask-based serverless backend** on Vercel, with a cache-first graph layer and environment-driven AWS integration.
 
-2. **Frontend API URL** (`src/services/dynamodb.ts`, etc.)
-   - **Issue**: `VITE_API_URL` must be set at build time
-   - **Impact**: Frontend cannot connect to backend if missing
-   - **Fix**: Set `VITE_API_URL` in Vercel environment variables before build
-   - **Location**: All frontend API calls
-
-3. **Backend Environment Variables**
-   - **Issue**: Backend expects `.env` file (not suitable for Vercel)
-   - **Impact**: AWS services won't work without credentials
-   - **Fix**: Use Vercel environment variables (accessed via `os.getenv()`)
-   - **Location**: `backend/__init__.py` (remove `.env` file requirement for production)
-
-4. **Graph Cache Location**
-   - **Issue**: Backend loads from `backend/cache/graph_cache.json` (not accessible in serverless)
-   - **Impact**: Graph data won't load if cache file not in deployment
-   - **Fix**: 
-     - Option A: Load from `public/graph_cache.json` (static file, served by Vercel)
-     - Option B: Load from environment variable (base64 encoded JSON)
-     - Option C: Load from external URL (CDN)
-   - **Location**: `backend/app.py:load_graph_cache()`
-
-5. **Static Graph Cache** (`public/graph_cache.json`)
-   - **Issue**: File exists but backend doesn't read it
-   - **Impact**: Backend won't serve graph data if `backend/cache/` not available
-   - **Fix**: Modify `load_graph_cache()` to check `public/graph_cache.json` as fallback
-   - **Location**: `backend/app.py:load_graph_cache()`
-
-### Medium Priority Blockers
-
-6. **Lab Info Endpoint Missing**
-   - **Issue**: Frontend calls `DynamoDBService.fetchLabInfos()` directly (frontend service)
-   - **Impact**: Lab modal won't show full info in production (if frontend DynamoDB removed)
-   - **Fix**: Add `/api/labs/info` endpoint in backend
-   - **Location**: `src/components/ResearchNetworkGraph.tsx:64`, `backend/app.py` (new endpoint)
-
-7. **Error Handling**
-   - **Issue**: No graceful fallbacks for missing AWS credentials
-   - **Impact**: App crashes instead of degrading gracefully
-   - **Fix**: Add try-catch blocks and return safe defaults (see Safe Defaults section)
-   - **Location**: All service files, all controllers
-
-8. **Debug Print Statements**
-   - **Issue**: `backend/services/dynamodb_service.py:6` prints AWS credentials (security risk)
-   - **Impact**: Credentials may leak in logs
-   - **Fix**: Remove or mask credential logging
-   - **Location**: `backend/services/dynamodb_service.py:6,19`
-
-### Low Priority (Nice to Have)
-
-9. **Hardcoded CORS Origins**
-   - **Issue**: Only allows `localhost:5173`
-   - **Impact**: Development only (production needs different origin)
-   - **Fix**: Use environment variable for allowed origins
-   - **Location**: `backend/app.py:26`
-
-10. **Empty Auth Module**
-   - **Issue**: `backend/utils/auth.py` is empty
-   - **Impact**: No authentication (may be intentional)
-   - **Fix**: Add auth if needed, or remove file
-   - **Location**: `backend/utils/auth.py`
-
-11. **Build Script Dependencies**
-   - **Issue**: `backend/build_graph_cache.py` requires `.env` file
-   - **Impact**: Cannot rebuild cache in CI/CD without `.env`
-   - **Fix**: Use environment variables (not file-based)
-   - **Location**: `backend/build_graph_cache.py:25-31`
-
----
-
-## Essential vs. Optional Code
-
-### Essential for Deployment (Core Functionality)
-
-**Backend**:
-- ✅ `backend/app.py` - Flask app, all endpoints
-- ✅ `backend/controllers/*.py` - All three controllers (PDF, RAG, recommendations)
-- ✅ `backend/services/*.py` - All three services (DynamoDB, S3, Bedrock)
-- ✅ `backend/graph_core.py` - Graph building logic (for rebuild endpoint)
-- ✅ `backend/__init__.py` - Environment loading (modify for Vercel)
-- ✅ `backend/cache/graph_cache.json` OR `public/graph_cache.json` - Static graph data
-
-**Frontend**:
-- ✅ `src/App.tsx`, `src/main.tsx` - Entry points
-- ✅ `src/components/ResearchNetworkGraph.tsx` - Main graph component
-- ✅ `src/components/SearchBar.tsx` - Search functionality
-- ✅ `src/components/*Modal.tsx` - All modals (researcher, paper chat, recommendations, lab)
-- ✅ `src/components/ResearcherProfilePanel.tsx` - Hover panel
-- ✅ `src/services/dynamodb.ts` - API client (no direct AWS calls)
-- ✅ `src/services/pdf.ts` - PDF parsing
-- ✅ `src/contexts/AccessibilityContext.tsx` - Accessibility features
-- ✅ `public/graph_cache.json` - Static graph data (for initial load)
-
-### Optional (Can Remove or Defer)
-
-**Backend**:
-- ⚠️ `backend/build_graph_cache.py` - Cache rebuild script (not needed in deployment, only for local dev)
-- ⚠️ `backend/debug_*.py` - Debug scripts (remove for production)
-- ⚠️ `backend/precompute_graph.py` - Precomputation script (not needed if using static cache)
-- ⚠️ `backend/tools/` - Utility scripts (not needed in deployment)
-- ⚠️ `backend/utils/auth.py` - Empty file (remove if not used)
-- ⚠️ `backend/utils/cors.py` - Unused (CORS configured directly in `app.py`)
-
-**Frontend**:
-- ✅ All components are essential (no optional frontend code)
-
-### Cleanup Needed (Post-Deployment)
-
-1. **Remove Debug Scripts**:
-   - `backend/debug_profile_graph.py`
-   - `backend/debug_test_env.py`
-
-2. **Remove Unused Utilities**:
-   - `backend/utils/cors.py` (if not used)
-   - `backend/utils/auth.py` (if empty and not needed)
-
-3. **Consolidate Graph Cache**:
-   - Decide on single source: `backend/cache/graph_cache.json` OR `public/graph_cache.json`
-   - Remove duplicate if both exist
-
-4. **Remove Build Tools from Deployment**:
-   - `backend/tools/` directory (keep in repo, but exclude from Vercel deployment)
-   - `backend/build_graph_cache.py` (keep for local dev, exclude from deployment)
-
----
-
-## Summary
-
-### Architecture Type
-- **Backend**: Flask Python (development) → Vercel Serverless Functions (production)
-- **Frontend**: Vite + React (static build) → Vercel static hosting
-- **Data Flow**: Frontend → Backend API → AWS Services (DynamoDB, S3, Bedrock)
-- **Caching**: Static `graph_cache.json` file (served instantly, no DynamoDB on read)
-
-### Key Dependencies
-- **AWS Services**: DynamoDB (8 tables), S3 (PDF storage), Bedrock (2 knowledge bases)
-- **Environment Variables**: 8 backend vars, 1 frontend var
-- **Static Assets**: `public/graph_cache.json` (initial data source)
-
-### Deployment Strategy
-1. **Frontend**: Build static files, deploy to Vercel static hosting
-2. **Backend**: Deploy Flask app as Vercel Serverless Functions (Python runtime)
-3. **Graph Data**: Use `public/graph_cache.json` as initial static source
-4. **AWS Credentials**: Set via Vercel environment variables (not `.env` file)
-5. **Fallbacks**: Add graceful degradation for missing AWS credentials
-
-### Next Steps
-1. Fix CORS configuration (environment-based origins)
-2. Modify `load_graph_cache()` to read from `public/graph_cache.json`
-3. Add safe fallbacks for all AWS service calls
-4. Remove debug print statements (security)
-5. Set `VITE_API_URL` in Vercel before build
-6. Configure Vercel environment variables for all AWS credentials
-
----
-
-**End of Analysis**
 

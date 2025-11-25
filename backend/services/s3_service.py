@@ -5,6 +5,15 @@ import os
 import boto3
 
 
+def _env(*names: str):
+    """Return the first non-empty environment variable from the list of names."""
+    for name in names:
+        value = os.getenv(name)
+        if value:
+            return value
+    return None
+
+
 def get_presigned_pdf_url(lab_id, document_id):
     """
     Generate a presigned URL for a PDF document in S3.
@@ -18,10 +27,10 @@ def get_presigned_pdf_url(lab_id, document_id):
     """
     s3 = boto3.client(
         "s3",
-        region_name=os.getenv("AWS_REGION")
+        region_name=_env("AWS_REGION", "VITE_AWS_REGION")
     )
     
-    bucket = os.getenv("S3_BUCKET_NAME")
+    bucket = _env("S3_BUCKET_NAME", "VITE_S3_BUCKET_NAME")
     key = f"{lab_id}/{document_id}.pdf"
     
     presigned_url = s3.generate_presigned_url(

@@ -5,5 +5,10 @@
       "destination": "/api/index.py"
     }
   ],
+  "functions": {
+    "api/index.py": {
+      "includeFiles": "backend/**,public/graph_cache.json"
+    }
+  },
   "ignoreCommand": "echo 'No ignore needed'"
 }

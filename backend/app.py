@@ -13,8 +13,8 @@ from backend.controllers.pdf_controller import pdf_bp
 
 app = Flask(__name__)
 
-# Enable CORS for localhost:5173 only
-CORS(app, origins=['http://localhost:5173'])
+# Enable CORS for all origins (Vercel handles domain security)
+CORS(app, origins=['*'])
 
 # In-memory graph cache (lazy-loaded on first request)
 _graph_cache = None
@@ -25,37 +25,32 @@ def load_graph_cache():
     global _graph_cache
     
     backend_dir = os.path.dirname(os.path.abspath(__file__))
-    cache_path = os.path.join(backend_dir, "cache", "graph_cache.json")
+    project_root = os.path.dirname(backend_dir)
     
-    # Try backend/cache/graph_cache.json first
-    if os.path.exists(cache_path):
-        try:
-            with open(cache_path, 'r', encoding='utf-8') as f:
-                _graph_cache = json.load(f)
-            nodes = _graph_cache.get("nodes", [])
-            links = _graph_cache.get("links", [])
-            print(f"[OK] Graph cache loaded from backend/cache: {len(nodes)} nodes, {len(links)} links")
-            return True
-        except Exception as e:
-            print(f"[WARNING] Failed to load graph cache from backend/cache: {e}")
+    # List of paths to try, in order of preference
+    paths_to_try = [
+        os.path.join(backend_dir, "cache", "graph_cache.json"),  # backend/cache/
+        os.path.join(project_root, "public", "graph_cache.json"),  # public/
+        os.path.join(project_root, "dist", "graph_cache.json"),  # dist/ (Vite output)
+        "/var/task/public/graph_cache.json",  # Vercel absolute path
+        "/var/task/dist/graph_cache.json",  # Vercel dist path
+    ]
     
-    # Fallback to public/graph_cache.json
-    public_path = os.path.join(os.path.dirname(__file__), "..", "public", "graph_cache.json")
-    public_path = os.path.normpath(public_path)
-    
-    if os.path.exists(public_path):
-        try:
-            with open(public_path, 'r', encoding='utf-8') as f:
-                _graph_cache = json.load(f)
-            nodes = _graph_cache.get("nodes", [])
-            links = _graph_cache.get("links", [])
-            print(f"[OK] Graph cache loaded from public/static: {len(nodes)} nodes, {len(links)} links")
-            return True
-        except Exception as e:
-            print(f"[WARNING] Failed to load graph cache from public/static: {e}")
+    for cache_path in paths_to_try:
+        cache_path = os.path.normpath(cache_path)
+        if os.path.exists(cache_path):
+            try:
+                with open(cache_path, 'r', encoding='utf-8') as f:
+                    _graph_cache = json.load(f)
+                nodes = _graph_cache.get("nodes", [])
+                links = _graph_cache.get("links", [])
+                print(f"[OK] Graph cache loaded from {cache_path}: {len(nodes)} nodes, {len(links)} links")
+                return True
+            except Exception as e:
+                print(f"[WARNING] Failed to load graph cache from {cache_path}: {e}")
     
     # Default to empty graph
-    print("[WARNING] Graph cache not found in backend/cache or public/static, using empty graph")
+    print(f"[WARNING] Graph cache not found in any location, using empty graph. Tried: {paths_to_try}")
     _graph_cache = {"nodes": [], "links": []}
     return False
 
