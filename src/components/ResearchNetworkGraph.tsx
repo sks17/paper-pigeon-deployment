@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import ForceGraph3D from '3d-force-graph';
 import SpriteText from 'three-spritetext';
 import * as THREE from 'three';
@@ -23,6 +24,7 @@ const ResearchNetworkGraph: React.FC<ResearchNetworkGraphProps> = ({ className =
   const [graphData, setGraphData] = useState<GraphData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const location = useLocation();
   
   // Accessibility
   const { settings } = useAccessibility();
@@ -490,6 +492,20 @@ const ResearchNetworkGraph: React.FC<ResearchNetworkGraphProps> = ({ className =
       </a>
       
       <div ref={containerRef} className="w-full h-full" id="main-content" />
+      
+      {/* VR Toggle Button */}
+      <Link
+        to={location.pathname === '/graph-vr' ? '/graph' : '/graph-vr'}
+        className={`fixed top-6 right-20 z-40 p-2 rounded-full bg-white/95 backdrop-blur border shadow hover:shadow-lg transition-all duration-200 focus-visible ${
+          location.pathname === '/graph-vr' 
+            ? 'bg-accent border-accent font-semibold' 
+            : ''
+        }`}
+        aria-label="Toggle VR mode"
+        title="Toggle VR mode"
+      >
+        <span className="text-sm font-medium">VR</span>
+      </Link>
       
       {/* Accessibility Panel Toggle */}
       <button
