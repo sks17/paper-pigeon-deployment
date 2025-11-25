@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import ForceGraph3D from '3d-force-graph';
 import SpriteText from 'three-spritetext';
 import * as THREE from 'three';
@@ -11,18 +12,28 @@ import PaperChatModal from './PaperChatModal';
 import LabModal from './LabModal';
 import AccessibilityPanel from './AccessibilityPanel';
 import { useAccessibility } from '@/contexts/AccessibilityContext';
-import { Settings } from 'lucide-react';
+import { Settings, Glasses } from 'lucide-react';
 
 interface ResearchNetworkGraphProps {
   className?: string;
+  graphData?: GraphData | null;
+  loading?: boolean;
 }
 
-const ResearchNetworkGraph: React.FC<ResearchNetworkGraphProps> = ({ className = '' }) => {
+const ResearchNetworkGraph: React.FC<ResearchNetworkGraphProps> = ({ 
+  className = '',
+  graphData: propGraphData,
+  loading: propLoading
+}) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const graphRef = useRef<any>(null);
-  const [graphData, setGraphData] = useState<GraphData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [localGraphData, setLocalGraphData] = useState<GraphData | null>(null);
+  const [localLoading, setLocalLoading] = useState(propGraphData === undefined);
   const [error, setError] = useState<string | null>(null);
+  
+  // Use prop data if provided, otherwise use local state
+  const graphData = propGraphData !== undefined ? propGraphData : localGraphData;
+  const loading = propLoading !== undefined ? propLoading : localLoading;
   
   // Accessibility
   const { settings } = useAccessibility();
@@ -254,27 +265,25 @@ const ResearchNetworkGraph: React.FC<ResearchNetworkGraphProps> = ({ className =
   }, []);
 
   useEffect(() => {
-    console.log("ResearchNetworkGraph: useEffect triggered, calling fetchData");
+    // Skip fetching if graphData is provided via props
+    if (propGraphData !== undefined) return;
+    
     const fetchData = async () => {
       try {
-        console.log("ResearchNetworkGraph: Setting loading=true");
-        setLoading(true);
+        setLocalLoading(true);
         setError(null);
-        console.log("ResearchNetworkGraph: About to call fetchGraphData()");
         const data = await fetchGraphData();
-        console.log("ResearchNetworkGraph: fetchGraphData() returned, setting graphData");
-        setGraphData(data);
+        setLocalGraphData(data);
       } catch (err) {
         console.error('ResearchNetworkGraph: Failed to fetch graph data:', err);
         setError('Failed to load research network data. Please check your AWS credentials and try again.');
       } finally {
-        console.log("ResearchNetworkGraph: Setting loading=false");
-        setLoading(false);
+        setLocalLoading(false);
       }
     };
 
     fetchData();
-  }, []);
+  }, [propGraphData]);
 
   useEffect(() => {
     if (!containerRef.current || !graphData) return;
@@ -491,6 +500,16 @@ const ResearchNetworkGraph: React.FC<ResearchNetworkGraphProps> = ({ className =
       
       <div ref={containerRef} className="w-full h-full" id="main-content" />
       
+      {/* VR Mode Button */}
+      <Link
+        to="/vr"
+        className="fixed top-6 right-20 z-40 p-2 rounded-full bg-white/95 backdrop-blur border shadow hover:shadow-lg transition-all duration-200 flex items-center gap-2"
+        title="Enter VR Mode"
+      >
+        <Glasses className="w-5 h-5" />
+        <span className="text-sm font-medium pr-1">VR</span>
+      </Link>
+      
       {/* Accessibility Panel Toggle */}
       <button
         onClick={() => setShowAccessibilityPanel(!showAccessibilityPanel)}
@@ -502,7 +521,7 @@ const ResearchNetworkGraph: React.FC<ResearchNetworkGraphProps> = ({ className =
       </button>
       
       {showAccessibilityPanel && (
-        <div className="fixed top-6 right-20 z-40">
+        <div className="fixed top-6 right-36 z-40">
           <AccessibilityPanel />
         </div>
       )}

@@ -11,6 +11,9 @@
   },
   "dependencies": {
     "3d-force-graph": "^1.79.0",
+    "3d-force-graph-vr": "^2.3.4",
+    "aframe": "^1.6.0",
+    "react-router-dom": "^6.28.0",
     "@aws-sdk/client-bedrock-agent-runtime": "^3.913.0",
     "@aws-sdk/client-dynamodb": "^3.913.0",
     "@aws-sdk/client-s3": "^3.913.0",
