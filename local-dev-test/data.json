@@ -1,0 +1,64 @@
+{
+  "nodes": [
+    {
+      "id": "12345",
+      "name": "Alice Smith",
+      "type": "researcher",
+      "val": 1,
+      "group": "biology",
+      "size": 3,
+      "color": "#7aa7ff",
+      "advisor": "Dr. Johnson",
+      "contact_info": ["alice.smith@university.edu"],
+      "labs": ["aims_lab"],
+      "standing": "PhD Student",
+      "tags": ["genomics", "AI", "machine learning"],
+      "influence": 75,
+      "about": "Researching deep learning applications in medical imaging."
+    },
+    {
+      "id": "67890",
+      "name": "Bob Jones",
+      "type": "researcher",
+      "val": 1,
+      "group": "physics",
+      "size": 2,
+      "color": "#ff9090",
+      "advisor": "Dr. Johnson",
+      "contact_info": ["bob.jones@university.edu"],
+      "labs": ["aims_lab"],
+      "standing": "PhD Student",
+      "tags": ["natural language processing", "transformers"],
+      "influence": 68,
+      "about": "Working on large language models for scientific literature."
+    },
+    {
+      "id": "11111",
+      "name": "Dr. Johnson",
+      "type": "researcher",
+      "val": 1,
+      "group": "computer_science",
+      "size": 4,
+      "color": "#90ee90",
+      "contact_info": ["johnson@university.edu"],
+      "labs": ["aims_lab"],
+      "standing": "Professor",
+      "tags": ["machine learning", "artificial intelligence", "data science"],
+      "influence": 92,
+      "about": "Leading researcher in AI and machine learning."
+    }
+  ],
+  "links": [
+    {
+      "source": "12345",
+      "target": "11111",
+      "type": "advisor"
+    },
+    {
+      "source": "67890",
+      "target": "11111",
+      "type": "paper"
+    }
+  ]
+}
+
