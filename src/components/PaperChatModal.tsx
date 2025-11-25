@@ -73,8 +73,7 @@ const PaperChatModal: React.FC<PaperChatModalProps> = ({
     setIsLoading(true);
 
     try {
-      const baseUrl = import.meta.env.VITE_API_URL || '';
-      const response = await fetch(`${baseUrl}/api/rag/chat`, {
+      const response = await fetch('/api/rag/chat', {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: inputValue.trim(), document_id: paper.document_id }),

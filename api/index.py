@@ -1,1 +1,2 @@
-from backend_wrapper import app
+# Direct import - no intermediate wrapper needed
+from backend.app import app

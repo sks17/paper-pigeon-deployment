@@ -196,8 +196,7 @@ const ResearchNetworkGraph: React.FC<ResearchNetworkGraphProps> = ({ className =
   const handleResumeParsed = useCallback(async (text: string) => {
     try {
       setIsRecommending(true);
-      const baseUrl = import.meta.env.VITE_API_URL || '';
-      const response = await fetch(`${baseUrl}/api/recommendations/from-resume`, {
+      const response = await fetch('/api/recommendations/from-resume', {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ resume_text: text }),
