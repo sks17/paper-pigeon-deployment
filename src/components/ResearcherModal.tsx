@@ -52,7 +52,8 @@ const ResearcherModal: React.FC<ResearcherModalProps> = ({
       }
       
       // Generate presigned URL
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/pdf/url`, {
+      const baseUrl = import.meta.env.VITE_API_URL || '';
+      const response = await fetch(`${baseUrl}/api/pdf/url`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ lab_id: labId, document_id: documentId }),

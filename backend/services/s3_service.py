@@ -27,7 +27,7 @@ def get_presigned_pdf_url(lab_id, document_id):
     """
     s3 = boto3.client(
         "s3",
-        region_name=_env("AWS_REGION", "VITE_AWS_REGION")
+        region_name=_env("S3_REGION", "AWS_REGION")
     )
     
     bucket = _env("S3_BUCKET_NAME", "VITE_S3_BUCKET_NAME")

@@ -47,7 +47,8 @@ export interface GraphData {
 
 export async function fetchGraphData(): Promise<GraphData> {
   console.log("Calling fetchGraphData...");
-  const url = `${import.meta.env.VITE_API_URL}/api/graph/data`;
+  const baseUrl = import.meta.env.VITE_API_URL || '';
+  const url = `${baseUrl}/api/graph/data`;
   console.log("Fetch URL:", url);
   console.log("Before fetch");
   
@@ -71,7 +72,8 @@ export async function fetchGraphData(): Promise<GraphData> {
 }
 
 export async function fetchPaperLabId(documentId: string): Promise<string | null> {
-  const res = await fetch(`${import.meta.env.VITE_API_URL}/api/graph/paper-lab-id`, {
+  const baseUrl = import.meta.env.VITE_API_URL || '';
+  const res = await fetch(`${baseUrl}/api/graph/paper-lab-id`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ document_id: documentId }),
