@@ -30,42 +30,51 @@ const VRGraph: React.FC<VRGraphProps> = ({ graphData, loading = false }) => {
       // Clear container completely
       containerRef.current.innerHTML = '';
       
-      // Pre-position nodes near the origin for visibility
-      const positionedNodes = graphData.nodes.map((node: any) => ({
-        ...node,
-        x: (Math.random() - 0.5) * 100,
-        y: (Math.random() - 0.5) * 100,
-        z: (Math.random() - 0.5) * 100 - 200, // Position nodes in front of camera
-      }));
+      // Position nodes in a grid pattern in front of camera for guaranteed visibility
+      const numNodes = graphData.nodes.length;
+      const gridSize = Math.ceil(Math.sqrt(numNodes));
+      const spacing = 30; // Units between nodes
+      
+      const positionedNodes = graphData.nodes.map((node: any, index: number) => {
+        const row = Math.floor(index / gridSize);
+        const col = index % gridSize;
+        return {
+          ...node,
+          // Fixed positions - no physics simulation
+          fx: (col - gridSize/2) * spacing,
+          fy: (row - gridSize/2) * spacing,
+          fz: -150, // 150 units in front of camera (camera starts at z=0 looking at -z)
+        };
+      });
       
       const positionedData = {
         nodes: positionedNodes,
-        links: graphData.links
+        links: graphData.links.map((link: any) => ({
+          ...link,
+          // Ensure links reference node objects correctly
+          source: link.source,
+          target: link.target,
+        }))
       };
+
+      console.log('Creating VR graph with positioned nodes:', positionedNodes.slice(0, 3));
 
       // Initialize VR graph
       const graph = ForceGraphVR()(containerRef.current);
       
-      // Configure graph settings
+      // Configure graph settings - SIMPLE configuration
       graph
         .graphData(positionedData)
         .nodeLabel((node: any) => node.name || node.id)
-        .nodeColor((node: any) => {
-          if (node.type === 'lab') return '#00ff00'; // Bright green for labs
-          return '#00aaff'; // Bright cyan for researchers  
-        })
-        .nodeVal((node: any) => {
-          const baseVal = node.val || 5;
-          return node.type === 'lab' ? baseVal * 4 : baseVal * 2;
-        })
-        .nodeRelSize(8) // Large base node size
+        .nodeColor((node: any) => node.type === 'lab' ? '#00ff00' : '#ff6600')
+        .nodeVal(10) // Fixed large size for all nodes
+        .nodeRelSize(5)
         .nodeOpacity(1)
         .linkColor(() => '#ffffff')
-        .linkWidth(2)
-        .linkOpacity(0.8)
-        .backgroundColor('#000011') // Dark blue background
-        .warmupTicks(100) // Let simulation run before rendering
-        .cooldownTicks(0); // Disable further simulation
+        .linkWidth(1)
+        .linkOpacity(0.5)
+        .warmupTicks(0) // Skip warmup since we use fixed positions
+        .cooldownTicks(0); // No simulation needed
 
       graphRef.current = graph;
       setIsInitialized(true);
@@ -139,39 +148,51 @@ const VRGraph: React.FC<VRGraphProps> = ({ graphData, loading = false }) => {
   }
 
   return (
-    <div className="w-full h-screen relative bg-black">
-      {/* Exit VR button */}
-      <div className="absolute top-4 left-4 z-50">
-        <Link
-          to="/"
-          className="px-4 py-2 bg-gray-800/80 hover:bg-gray-700 text-white rounded-lg border border-gray-600 transition-colors flex items-center gap-2"
-        >
-          <span>←</span>
-          <span>Exit VR Mode</span>
-        </Link>
-      </div>
+    <>
+      {/* VR Graph container - MUST be at root level, no background parents */}
+      <div 
+        ref={containerRef} 
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100vw',
+          height: '100vh',
+          zIndex: 1,
+        }}
+      />
       
-      {/* Status indicator */}
-      <div className="absolute top-4 right-4 z-50">
-        <div className={`px-3 py-1 rounded-full text-sm ${isInitialized ? 'bg-green-600' : 'bg-yellow-600'} text-white`}>
-          {isInitialized ? `✓ ${graphData?.nodes?.length || 0} nodes loaded` : 'Initializing...'}
+      {/* UI Overlay - on top of A-Frame */}
+      <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 100 }}>
+        {/* Exit VR button */}
+        <div className="absolute top-4 left-4" style={{ pointerEvents: 'auto' }}>
+          <Link
+            to="/"
+            className="px-4 py-2 bg-gray-800/90 hover:bg-gray-700 text-white rounded-lg border border-gray-600 transition-colors flex items-center gap-2"
+          >
+            <span>←</span>
+            <span>Exit VR Mode</span>
+          </Link>
+        </div>
+        
+        {/* Status indicator */}
+        <div className="absolute top-4 right-4" style={{ pointerEvents: 'auto' }}>
+          <div className={`px-3 py-1 rounded-full text-sm ${isInitialized ? 'bg-green-600' : 'bg-yellow-600'} text-white`}>
+            {isInitialized ? `✓ ${graphData?.nodes?.length || 0} nodes loaded` : 'Initializing...'}
+          </div>
+        </div>
+
+        {/* VR instructions */}
+        <div className="absolute bottom-4 left-4 text-white/90 text-sm bg-black/70 p-3 rounded-lg max-w-xs" style={{ pointerEvents: 'auto' }}>
+          <p className="font-semibold mb-1">VR Controls:</p>
+          <ul className="text-xs space-y-1">
+            <li>• Use WASD keys to move around</li>
+            <li>• Click and drag to rotate view</li>
+            <li>• Scroll to zoom in/out</li>
+          </ul>
         </div>
       </div>
-
-      {/* VR Graph container */}
-      <div ref={containerRef} className="w-full h-full" />
-
-      {/* VR instructions */}
-      <div className="absolute bottom-4 left-4 z-50 text-white/70 text-sm bg-black/50 p-3 rounded-lg max-w-xs">
-        <p className="font-semibold mb-1">VR Controls:</p>
-        <ul className="text-xs space-y-1">
-          <li>• Use WASD keys to move around</li>
-          <li>• Click and drag to rotate view</li>
-          <li>• Scroll to zoom in/out</li>
-          <li>• Nodes are positioned around origin</li>
-        </ul>
-      </div>
-    </div>
+    </>
   );
 };
 
