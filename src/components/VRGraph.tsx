@@ -15,6 +15,7 @@ const VRGraph: React.FC<VRGraphProps> = ({ graphData, loading = false }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const graphRef = useRef<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
     if (!containerRef.current || !graphData) return;
@@ -26,30 +27,51 @@ const VRGraph: React.FC<VRGraphProps> = ({ graphData, loading = false }) => {
         graphRef.current = null;
       }
 
-      // Clear container
+      // Clear container completely
       containerRef.current.innerHTML = '';
+      
+      // Pre-position nodes near the origin for visibility
+      const positionedNodes = graphData.nodes.map((node: any) => ({
+        ...node,
+        x: (Math.random() - 0.5) * 100,
+        y: (Math.random() - 0.5) * 100,
+        z: (Math.random() - 0.5) * 100 - 200, // Position nodes in front of camera
+      }));
+      
+      const positionedData = {
+        nodes: positionedNodes,
+        links: graphData.links
+      };
 
-      // Initialize VR graph with visible node settings
-      const graph = ForceGraphVR()(containerRef.current)
-        .graphData(graphData)
+      // Initialize VR graph
+      const graph = ForceGraphVR()(containerRef.current);
+      
+      // Configure graph settings
+      graph
+        .graphData(positionedData)
         .nodeLabel((node: any) => node.name || node.id)
         .nodeColor((node: any) => {
-          if (node.type === 'lab') return '#22c55e'; // Bright green for labs
-          return '#60a5fa'; // Bright blue for researchers
+          if (node.type === 'lab') return '#00ff00'; // Bright green for labs
+          return '#00aaff'; // Bright cyan for researchers  
         })
         .nodeVal((node: any) => {
-          // Scale up node values for VR visibility
-          const baseVal = node.val || 1;
-          return node.type === 'lab' ? baseVal * 3 : baseVal * 2;
+          const baseVal = node.val || 5;
+          return node.type === 'lab' ? baseVal * 4 : baseVal * 2;
         })
-        .nodeRelSize(6) // Larger base node size for VR
-        .nodeOpacity(1) // Full opacity
-        .linkColor(() => 'rgba(255,255,255,0.4)')
-        .linkWidth(1)
-        .linkOpacity(0.6);
+        .nodeRelSize(8) // Large base node size
+        .nodeOpacity(1)
+        .linkColor(() => '#ffffff')
+        .linkWidth(2)
+        .linkOpacity(0.8)
+        .backgroundColor('#000011') // Dark blue background
+        .warmupTicks(100) // Let simulation run before rendering
+        .cooldownTicks(0); // Disable further simulation
 
       graphRef.current = graph;
+      setIsInitialized(true);
       setError(null);
+      
+      console.log('VR Graph initialized with', positionedNodes.length, 'nodes');
     } catch (err) {
       console.error('VR Graph initialization failed:', err);
       setError(err instanceof Error ? err.message : 'Failed to initialize VR mode');
@@ -128,6 +150,13 @@ const VRGraph: React.FC<VRGraphProps> = ({ graphData, loading = false }) => {
           <span>Exit VR Mode</span>
         </Link>
       </div>
+      
+      {/* Status indicator */}
+      <div className="absolute top-4 right-4 z-50">
+        <div className={`px-3 py-1 rounded-full text-sm ${isInitialized ? 'bg-green-600' : 'bg-yellow-600'} text-white`}>
+          {isInitialized ? `✓ ${graphData?.nodes?.length || 0} nodes loaded` : 'Initializing...'}
+        </div>
+      </div>
 
       {/* VR Graph container */}
       <div ref={containerRef} className="w-full h-full" />
@@ -136,9 +165,10 @@ const VRGraph: React.FC<VRGraphProps> = ({ graphData, loading = false }) => {
       <div className="absolute bottom-4 left-4 z-50 text-white/70 text-sm bg-black/50 p-3 rounded-lg max-w-xs">
         <p className="font-semibold mb-1">VR Controls:</p>
         <ul className="text-xs space-y-1">
-          <li>• Click "Enter VR" button (bottom right) for immersive mode</li>
-          <li>• Use headset controllers to navigate</li>
-          <li>• Look at nodes to see labels</li>
+          <li>• Use WASD keys to move around</li>
+          <li>• Click and drag to rotate view</li>
+          <li>• Scroll to zoom in/out</li>
+          <li>• Nodes are positioned around origin</li>
         </ul>
       </div>
     </div>

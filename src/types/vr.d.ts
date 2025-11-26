@@ -18,6 +18,9 @@ declare module '3d-force-graph-vr' {
     linkColor(accessor: string | ((link: any) => string)): ForceGraphVRInstance;
     linkWidth(width: number | ((link: any) => number)): ForceGraphVRInstance;
     linkOpacity(opacity: number): ForceGraphVRInstance;
+    backgroundColor(color: string): ForceGraphVRInstance;
+    warmupTicks(ticks: number): ForceGraphVRInstance;
+    cooldownTicks(ticks: number): ForceGraphVRInstance;
     _destructor?(): void;
   }
 
