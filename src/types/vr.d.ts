@@ -13,8 +13,11 @@ declare module '3d-force-graph-vr' {
     nodeLabel(accessor: string | ((node: any) => string)): ForceGraphVRInstance;
     nodeColor(accessor: string | ((node: any) => string)): ForceGraphVRInstance;
     nodeVal(accessor: string | number | ((node: any) => number)): ForceGraphVRInstance;
+    nodeRelSize(size: number): ForceGraphVRInstance;
+    nodeOpacity(opacity: number): ForceGraphVRInstance;
     linkColor(accessor: string | ((link: any) => string)): ForceGraphVRInstance;
     linkWidth(width: number | ((link: any) => number)): ForceGraphVRInstance;
+    linkOpacity(opacity: number): ForceGraphVRInstance;
     _destructor?(): void;
   }
 

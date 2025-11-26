@@ -29,17 +29,24 @@ const VRGraph: React.FC<VRGraphProps> = ({ graphData, loading = false }) => {
       // Clear container
       containerRef.current.innerHTML = '';
 
-      // Initialize VR graph
+      // Initialize VR graph with visible node settings
       const graph = ForceGraphVR()(containerRef.current)
         .graphData(graphData)
         .nodeLabel((node: any) => node.name || node.id)
         .nodeColor((node: any) => {
-          if (node.type === 'lab') return '#10b981';
-          return '#3b82f6';
+          if (node.type === 'lab') return '#22c55e'; // Bright green for labs
+          return '#60a5fa'; // Bright blue for researchers
         })
-        .nodeVal((node: any) => node.val || 1)
-        .linkColor(() => 'rgba(255,255,255,0.2)')
-        .linkWidth(0.5);
+        .nodeVal((node: any) => {
+          // Scale up node values for VR visibility
+          const baseVal = node.val || 1;
+          return node.type === 'lab' ? baseVal * 3 : baseVal * 2;
+        })
+        .nodeRelSize(6) // Larger base node size for VR
+        .nodeOpacity(1) // Full opacity
+        .linkColor(() => 'rgba(255,255,255,0.4)')
+        .linkWidth(1)
+        .linkOpacity(0.6);
 
       graphRef.current = graph;
       setError(null);
