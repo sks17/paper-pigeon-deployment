@@ -1,160 +1,387 @@
-# Paper Pigeon
+<div align="center">
 
-Interactive research network explorer with resume-driven recommendations, RAG-powered paper chat, and rich researcher/lab profiles.
+<br/>
 
-## Features
+<!-- Banner Section -->
+<a href="https://paper-pigeon-deployment.vercel.app/">
+  <img src="src/assets/favicon.jpeg" alt="Paper Pigeon Logo" width="120" height="120" style="border-radius: 20px;" />
+</a>
 
-- **Research Network Graph**
-  - 3D ForceGraph with labs and researchers, hover profiles, and clickable nodes
-  - Smart highlighting from search and keyboard navigation
-  - VR mode available at `/vr` route
+<br/>
+<br/>
 
-- **Search & Quick Select**
-  - Fast typeahead for researchers, labs, and tags
-  - Enter to select, arrow keys to navigate
+# ✨ Paper Pigeon ✨
 
-- **Resume Upload & Recommendations**
-  - Client-side PDF parsing; resume text runs through Bedrock RAG
-  - Recommendations modal with similarity scores; names clickable to open profiles
+<br/>
 
-- **Paper Chat (RAG)**
-  - Ask questions about a paper; responses include citations
-  - Uses Bedrock Retrieve-and-Generate with knowledge base
+**Explore research like never before — a 3D universe of ideas takes flight.**
 
-- **Researcher Profiles**
-  - Full modal with contact info, labs, tags, publications, and influence score
-  - Hover panel for quick glance; clickable items to open full modal or paper chat
+<br/>
 
-## Architecture
+[![Live Demo](https://img.shields.io/badge/🚀_Live_Demo-paper--pigeon.vercel.app-blue?style=for-the-badge)](https://paper-pigeon-deployment.vercel.app/)
 
-```
-Frontend (React + Vite)        Backend (Flask on Vercel)
-        │                              │
-        │  /api/graph/data            │
-        ├─────────────────────────────┤ Graph cache (JSON)
-        │                              │
-        │  /api/rag/chat              │
-        ├─────────────────────────────┤ AWS Bedrock
-        │                              │
-        │  /api/recommendations       │
-        ├─────────────────────────────┤ AWS Bedrock
-        │                              │
-        │  /api/pdf/url               │
-        └─────────────────────────────┤ AWS S3 (presigned)
-```
+<br/>
 
-- **Frontend**: React 19 + TypeScript, hosted as static files on Vercel
-- **Backend**: Flask Python app running as Vercel Serverless Functions
-- **Data**: AWS DynamoDB (researchers, papers), S3 (PDFs), Bedrock (RAG)
+<!-- Tech Stack Badges -->
+<p>
+  <img src="https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=white" alt="React" />
+  <img src="https://img.shields.io/badge/Vite-7-646CFF?style=flat-square&logo=vite&logoColor=white" alt="Vite" />
+  <img src="https://img.shields.io/badge/TypeScript-5.9-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/Python-3.12-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python" />
+  <img src="https://img.shields.io/badge/Flask-API-000000?style=flat-square&logo=flask&logoColor=white" alt="Flask" />
+</p>
+<p>
+  <img src="https://img.shields.io/badge/AWS_Bedrock-RAG-FF9900?style=flat-square&logo=amazonaws&logoColor=white" alt="AWS Bedrock" />
+  <img src="https://img.shields.io/badge/DynamoDB-Database-4053D6?style=flat-square&logo=amazondynamodb&logoColor=white" alt="DynamoDB" />
+  <img src="https://img.shields.io/badge/S3-Storage-569A31?style=flat-square&logo=amazons3&logoColor=white" alt="S3" />
+  <img src="https://img.shields.io/badge/Vercel-Serverless-000000?style=flat-square&logo=vercel&logoColor=white" alt="Vercel" />
+  <img src="https://img.shields.io/badge/Cloudflare-Workers-F38020?style=flat-square&logo=cloudflare&logoColor=white" alt="Cloudflare" />
+</p>
+<p>
+  <img src="https://img.shields.io/badge/3d--force--graph-WebGL-FF6B6B?style=flat-square" alt="3d-force-graph" />
+  <img src="https://img.shields.io/badge/A--Frame-VR-EF2D5E?style=flat-square&logo=aframe&logoColor=white" alt="A-Frame VR" />
+  <img src="https://img.shields.io/badge/Three.js-3D-000000?style=flat-square&logo=threedotjs&logoColor=white" alt="Three.js" />
+  <img src="https://img.shields.io/badge/Tailwind-CSS-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white" alt="Tailwind" />
+</p>
 
-## Tech Stack
+<br/>
 
-- React 19, TypeScript, Vite 7
-- Tailwind CSS v4 (+ shadcn/ui components)
-- 3d-force-graph, three.js for visualization
-- pdfjs-dist for client-side PDF parsing
-- Flask, Flask-CORS for backend API
-- boto3 for AWS integrations
+---
 
-## Environment Variables
+</div>
 
-### Frontend (Vite - build time)
+<br/>
 
-No frontend environment variables required. All API calls use relative URLs.
+<div align="center">
 
-### Backend (Vercel - runtime)
+## 🎬 See It In Action
 
-Set these in Vercel Dashboard → Settings → Environment Variables:
+<br/>
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `AWS_ACCESS_KEY_ID` | Yes | AWS IAM access key |
-| `AWS_SECRET_ACCESS_KEY` | Yes | AWS IAM secret key |
-| `AWS_REGION` | Yes | AWS region (e.g., `us-west-2`) |
-| `S3_BUCKET_NAME` | Yes | S3 bucket containing PDF files |
-| `BEDROCK_KNOWLEDGE_BASE_ID` | Yes | Primary Bedrock KB for paper chat |
-| `BEDROCK_DATA_SOURCE_ID` | No | Data source ID (optional) |
-| `BEDROCK_KNOWLEDGE_BASE_ID_2` | Yes | Secondary KB for recommendations |
+<img src="PaperPigeonDemo.gif" alt="Paper Pigeon Demo" width="800" style="border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.3);" />
 
-## Data Tables (DynamoDB)
+<br/>
+<br/>
 
-- `researchers`: `{ researcher_id, name, advisor, contact_info[], labs[], standing, tags[], influence, about }`
-- `papers`: `{ document_id, title, year, tags[], lab_id }`
-- `library`: `{ researcher_id, document_id }`
-- `paper-edges`: `{ researcher_one_id, researcher_two_id }`
-- `advisor_edges`: `{ advisee_id, advisor_id }`
-- `lab-info`: `{ lab_id, description, faculty[] }`
+</div>
 
-## Development
+---
+
+<br/>
+
+## 🌟 Features
+
+<br/>
+
+<table>
+<tr>
+<td width="50%">
+
+### 🔮 **Interactive 3D Graph**
+Navigate a stunning force-directed graph of researchers, labs, and papers. Click, drag, zoom — make the data dance.
+
+### 🥽 **VR Mode**
+Step inside your research network. Put on a headset and walk through connections in full immersive VR.
+
+### 📄 **Resume Semantic Matching**
+Upload your resume. Our AI finds researchers whose work aligns with your experience and interests.
+
+### 🤖 **Bedrock RAG Chat**
+Ask questions about any paper. Get intelligent answers with citations, powered by AWS Bedrock's retrieval-augmented generation.
+
+### 🔍 **Research Paper Explorer**
+Dive deep into researcher profiles, publications, tags, and lab affiliations. Everything connected, everything searchable.
+
+</td>
+<td width="50%">
+
+### ⚡ **Static Graph Cache**
+Lightning-fast load times. The entire research network is pre-computed and cached as optimized JSON.
+
+### ☁️ **Serverless Architecture**
+Zero servers to maintain. Flask API runs as Vercel Serverless Functions with automatic scaling.
+
+### 🕐 **Cloudflare Scheduled Rebuilds**
+Nightly cron jobs keep the graph fresh. New papers and researchers appear automatically.
+
+### 📎 **PDF Scanning & S3 Uploads**
+Client-side PDF parsing meets secure S3 presigned URLs. Access papers instantly, securely.
+
+### 🎨 **Modern Frontend**
+Built with Vite + React 19 + TypeScript. Tailwind CSS for that crisp, responsive feel.
+
+</td>
+</tr>
+</table>
+
+<br/>
+
+---
+
+<br/>
+
+<div align="center">
+
+## 🏗️ Architecture
+
+<br/>
+
+<img src="PaperPigeonFlowchart.png" alt="Paper Pigeon Architecture" width="100%" style="border-radius: 8px;" />
+
+<br/>
+
+</div>
+
+<br/>
+
+> 💡 **Note:** This diagram is a conceptual overview of the system. The actual implementation may vary in specific details, but the overall data flow and component boundaries are accurately represented.
+
+<br/>
+
+### 🔄 The Pipeline
+
+**Code → Deploy → Serve**
+
+1. **GitHub** pushes trigger the **Vercel CI/CD Pipeline**
+2. **Playwright frontend tests** and **Python backend health checks** validate the build
+3. Two parallel builds run:
+   - **Frontend Build** (Vite + React) → Deployed to Vercel Edge
+   - **Backend Build** (Python Serverless) → Deployed as Vercel Functions
+4. The deployed frontend serves two main experiences:
+   - 🔮 **Standard Graph Page** — 3d-force-graph WebGL visualization
+   - 🥽 **VR Graph Page** — Immersive A-Frame VR experience
+
+**API & Data Layer**
+
+5. All `/api/*` requests route to **Vercel Serverless Functions**
+6. The API connects to three AWS services:
+   - 🤖 **Bedrock** — RAG chat + resume recommendation AI
+   - 📎 **S3** — PDF storage with presigned URL access
+   - 📊 **DynamoDB** — Researcher, paper, and relationship data
+
+**Cache & Scheduling**
+
+7. **Cloudflare Workers** run a nightly cron job
+8. The **Graph Cache Builder** (Python) queries DynamoDB and generates `graph_cache.json`
+9. This static cache enables instant graph loads without runtime database queries
+
+<br/>
+
+### 📦 Key Components
+
+| Layer | Technology | Purpose |
+|-------|------------|---------|
+| **CI/CD** | GitHub → Vercel | Automated deployments on every push |
+| **Testing** | Playwright + Python | Frontend E2E tests & backend health checks |
+| **Frontend** | Vite + React + TypeScript | Fast, modern SPA with 3D visualization |
+| **Backend** | Flask on Vercel Serverless | API routes with zero cold-start overhead |
+| **3D Engine** | 3d-force-graph + Three.js | WebGL-powered network visualization |
+| **VR** | A-Frame + 3d-force-graph-vr | Immersive VR research exploration |
+| **AI/ML** | AWS Bedrock | RAG chat & semantic resume matching |
+| **Database** | DynamoDB | Researchers, papers, edges, metadata |
+| **Storage** | S3 | PDF documents with presigned URL access |
+| **Scheduling** | Cloudflare Workers | Nightly graph cache rebuilds |
+| **Cache** | Static JSON | Pre-computed graph for instant loads |
+
+<br/>
+
+---
+
+<br/>
+
+## 🚀 Build & Development
+
+<br/>
 
 ### Prerequisites
 
-- Node.js 18+
-- pnpm (or npm/yarn)
-- Python 3.12+ (for local backend)
+```bash
+# Required
+node >= 18.0.0
+pnpm (or npm/yarn)
+python >= 3.12
+```
 
-### Install and Run
+<br/>
+
+### Quick Start
 
 ```bash
+# Clone the repository
+git clone https://github.com/your-org/paper-pigeon.git
+cd paper-pigeon
+
 # Install frontend dependencies
 pnpm install
 
-# Start frontend dev server
+# Start the development server
 pnpm dev
 ```
 
-For local backend development:
+Frontend runs at **http://localhost:5173** 🎉
+
+<br/>
+
+### Backend Development
 
 ```bash
-# Create Python virtual environment
+# Create and activate virtual environment
 python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+source venv/bin/activate  # Windows: venv\Scripts\activate
 
 # Install Python dependencies
 pip install -r requirements.txt
 
-# Run Flask backend
+# Run Flask backend locally
 python backend/app.py
 ```
 
-The frontend runs at `http://localhost:5173` and the backend at `http://localhost:5000`.
+Backend runs at **http://localhost:5000** 🐍
 
-## Building
+<br/>
+
+### Environment Variables
+
+Create a `.env` file or set these in your Vercel dashboard:
+
+| Variable | Required | Description |
+|----------|:--------:|-------------|
+| `AWS_ACCESS_KEY_ID` | ✅ | AWS credentials |
+| `AWS_SECRET_ACCESS_KEY` | ✅ | AWS credentials |
+| `AWS_REGION` | ✅ | AWS region (e.g., `us-west-2`) |
+| `S3_BUCKET_NAME` | ✅ | Bucket for PDF storage |
+| `BEDROCK_KNOWLEDGE_BASE_ID` | ✅ | Primary KB for paper chat |
+| `BEDROCK_KNOWLEDGE_BASE_ID_2` | ✅ | Secondary KB for recommendations |
+
+<br/>
+
+### Rebuild Graph Cache
 
 ```bash
-pnpm build
-pnpm preview
+# Rebuild from DynamoDB (requires AWS credentials)
+python backend/build_graph_cache.py
+
+# Upload to S3 (optional, for Lambda deployments)
+python tools/upload_cache.py
 ```
 
-## Deployment
+<br/>
 
-This project deploys to Vercel with:
-- Static frontend from Vite build
-- Python serverless functions for the API
+### Testing
 
-See `vercel.json` for configuration and `ARCHITECTURE_ANALYSIS.md` for detailed deployment documentation.
+```bash
+# TypeScript type checking + build
+pnpm build
 
-## Project Structure
+# Lint
+pnpm lint
+
+# Run Playwright tests (if configured)
+npx playwright test
+
+# Backend health check
+curl http://localhost:5000/health
+```
+
+<br/>
+
+### Deploy to Vercel
+
+```bash
+# Install Vercel CLI
+npm i -g vercel
+
+# Deploy
+vercel --prod
+```
+
+Or just push to your connected GitHub repo — Vercel handles the rest! 🚀
+
+<br/>
+
+---
+
+<br/>
+
+<div align="center">
+
+## 📁 Project Structure
+
+</div>
+
+<br/>
 
 ```
 paper-pigeon/
-├── api/
+├── 📂 api/
 │   └── index.py              # Vercel serverless entry point
-├── backend/
+│
+├── 📂 backend/
 │   ├── app.py                # Flask application
-│   ├── graph_core.py         # Graph builder
-│   ├── controllers/          # API route handlers
-│   └── services/             # AWS service wrappers
-├── src/
-│   ├── components/           # React components
-│   ├── services/             # Frontend API client
-│   └── contexts/             # React contexts
-├── public/
-│   └── graph_cache.json      # Static graph data
+│   ├── graph_core.py         # Graph builder logic
+│   ├── 📂 controllers/       # API route handlers
+│   │   ├── rag_controller.py
+│   │   ├── pdf_controller.py
+│   │   └── recommendations_controller.py
+│   └── 📂 services/          # AWS integrations
+│       ├── bedrock_service.py
+│       ├── dynamodb_service.py
+│       └── s3_service.py
+│
+├── 📂 src/
+│   ├── App.tsx               # Root component
+│   ├── 📂 components/        # React components
+│   │   ├── ResearchNetworkGraph.tsx   # Main 3D graph
+│   │   ├── VRGraph.tsx                # VR mode
+│   │   ├── SearchBar.tsx              # Search + resume upload
+│   │   ├── ResearcherModal.tsx        # Profile modals
+│   │   ├── PaperChatModal.tsx         # RAG chat interface
+│   │   └── ...
+│   └── 📂 services/          # Frontend API client
+│       └── dynamodb.ts
+│
+├── 📂 public/
+│   └── graph_cache.json      # Pre-computed graph data
+│
 ├── vercel.json               # Vercel configuration
-└── requirements.txt          # Python dependencies
+├── requirements.txt          # Python dependencies
+└── package.json              # Node dependencies
 ```
 
-## License
+<br/>
+
+---
+
+<br/>
+
+<div align="center">
+
+## 🤝 Contributing
+
+Pull requests welcome! For major changes, please open an issue first.
+
+<br/>
+
+## 📜 License
 
 MIT
+
+<br/>
+<br/>
+
+---
+
+<br/>
+
+**Built with 💜 by researchers, for researchers.**
+
+<br/>
+
+<a href="https://paper-pigeon-deployment.vercel.app/">
+  <img src="https://img.shields.io/badge/Try_Paper_Pigeon_Now-→-blue?style=for-the-badge" alt="Try Now" />
+</a>
+
+<br/>
+<br/>
+
+</div>
