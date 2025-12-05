@@ -4,13 +4,13 @@ Utility scripts for managing the graph cache.
 
 ## upload_cache.py
 
-Uploads the locally built graph cache to S3 for Lambda deployment.
+Uploads the locally built graph cache to S3.
 
 ### Prerequisites
 
 1. Build the cache locally:
    ```bash
-   python backend/tools/rebuild_graph_cache.py
+   python backend/build_graph_cache.py
    ```
 
 2. Ensure the cache file exists:
@@ -20,14 +20,14 @@ Uploads the locally built graph cache to S3 for Lambda deployment.
 
 ### Environment Variables
 
-Required:
+**Required:**
 - `S3_BUCKET_NAME`: S3 bucket to upload to
-- `AWS_ACCESS_KEY_ID`: AWS access key (or use AWS credentials file)
-- `AWS_SECRET_ACCESS_KEY`: AWS secret key (or use AWS credentials file)
 
-Optional:
+**Optional:**
 - `CACHE_KEY`: S3 key for the cache file (defaults to `graph_cache.json`)
 - `AWS_REGION`: AWS region (defaults to `us-east-1`)
+- `AWS_ACCESS_KEY_ID`: AWS access key (or use AWS credentials file)
+- `AWS_SECRET_ACCESS_KEY`: AWS secret key (or use AWS credentials file)
 
 ### Usage
 
@@ -36,7 +36,6 @@ Optional:
 export AWS_ACCESS_KEY_ID=your-access-key
 export AWS_SECRET_ACCESS_KEY=your-secret-key
 export S3_BUCKET_NAME=your-bucket-name
-export CACHE_KEY=graph_cache.json  # Optional
 python tools/upload_cache.py
 ```
 
@@ -67,7 +66,7 @@ Cache is now available at: s3://paper-pigeon-cache/graph_cache.json
 
 The script will exit with an error if:
 - `S3_BUCKET_NAME` is not set
-- Cache file doesn't exist (run rebuild script first)
+- Cache file doesn't exist (run build script first)
 - S3 upload fails (check credentials and permissions)
 - AWS credentials are invalid
 
@@ -77,21 +76,7 @@ Combine with cache rebuild for automated updates:
 
 ```bash
 # Rebuild and upload in one command
-python backend/tools/rebuild_graph_cache.py && python tools/upload_cache.py
-```
-
-Or create a shell script:
-```bash
-#!/bin/bash
-# rebuild_and_upload.sh
-
-python backend/tools/rebuild_graph_cache.py
-if [ $? -eq 0 ]; then
-    python tools/upload_cache.py
-else
-    echo "Cache rebuild failed, skipping upload"
-    exit 1
-fi
+python backend/build_graph_cache.py && python tools/upload_cache.py
 ```
 
 ### IAM Permissions Required
@@ -104,12 +89,15 @@ The AWS credentials need S3 PutObject permission:
   "Statement": [
     {
       "Effect": "Allow",
-      "Action": [
-        "s3:PutObject"
-      ],
+      "Action": ["s3:PutObject"],
       "Resource": "arn:aws:s3:::YOUR_BUCKET_NAME/*"
     }
   ]
 }
 ```
 
+## Notes
+
+- This script is primarily useful for deploying cache updates to S3 for Lambda-based deployments
+- For Vercel deployments, the cache is included directly in the serverless function via `vercel.json` configuration
+- The `public/graph_cache.json` file is the primary source for Vercel deployments

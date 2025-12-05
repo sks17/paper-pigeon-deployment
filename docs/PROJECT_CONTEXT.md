@@ -1,215 +1,266 @@
 # Paper Pigeon - Project Context
 
 > **Complete project summary and current status**  
-> Last updated: November 2025
+> Last updated: December 2025
 
 ---
 
 ## Table of Contents
 
 1. [System Overview](#system-overview)
-2. [Architecture Evolution](#architecture-evolution)
-3. [Caching Strategy](#caching-strategy)
-4. [Backend Architecture](#backend-architecture)
-5. [Frontend Graph Schema](#frontend-graph-schema)
-6. [Debugging History](#debugging-history)
-7. [AWS Deployment Progress](#aws-deployment-progress)
-8. [Where We Left Off](#where-we-left-off) ⚠️
-9. [Future Roadmap](#future-roadmap)
+2. [Architecture](#architecture)
+3. [Backend API](#backend-api)
+4. [Frontend Components](#frontend-components)
+5. [Graph Data Schema](#graph-data-schema)
+6. [AWS Integrations](#aws-integrations)
+7. [Deployment](#deployment)
+8. [Development Guide](#development-guide)
 
 ---
 
 ## System Overview
 
-**Paper Pigeon** is a research network visualization application that displays relationships between researchers, labs, papers, and academic collaborations at the University of Washington.
+**Paper Pigeon** is a research network visualization application that displays relationships between researchers, labs, papers, and academic collaborations.
 
 ### Core Functionality
 
 - **3D Interactive Graph**: Visualize researcher networks with nodes (researchers, labs) and edges (paper collaborations, advisor relationships)
 - **Researcher Profiles**: View detailed information about researchers, their papers, tags, and contact info
-- **Paper Chat**: RAG-based Q&A system for querying research papers
-- **Resume Matching**: Upload resume text to find matching researchers and labs
+- **Paper Chat**: RAG-based Q&A system for querying research papers via AWS Bedrock
+- **Resume Matching**: Upload resume text to find matching researchers
 - **PDF Access**: Generate presigned S3 URLs for viewing research papers
+- **VR Mode**: Optional VR visualization available at `/vr` route
 
 ### Technology Stack
 
-- **Frontend**: React + TypeScript, Vite, Three.js (3D graph), Tailwind CSS
-- **Backend**: Python Flask (development), AWS Lambda (production)
-- **Data Storage**: AWS DynamoDB (researchers, papers, edges), AWS S3 (PDFs, cache)
+- **Frontend**: React 19 + TypeScript, Vite 7, Three.js (3D graph), Tailwind CSS
+- **Backend**: Flask Python, deployed as Vercel Serverless Functions
+- **Data Storage**: AWS DynamoDB (researchers, papers, edges), AWS S3 (PDFs)
 - **AI/ML**: AWS Bedrock (RAG chat, recommendations)
-- **Deployment**: GitHub Actions → S3 (frontend) + Lambda (backend)
+- **Deployment**: Vercel (static frontend + Python serverless)
 
 ---
 
-## Architecture Evolution
+## Architecture
 
-### Old Architecture (Initial Implementation)
-
-```
-Frontend (React)
-  ├── Direct AWS SDK calls (boto3 via CDN)
-  │   ├── DynamoDB queries
-  │   ├── S3 operations
-  │   └── Bedrock RAG
-  └── No backend API layer
-```
-
-**Problems:**
-- Security risk: AWS credentials exposed in frontend
-- Performance: Multiple direct database queries per page load
-- Scalability: No caching, no request optimization
-- Debugging: Hard to trace errors across client/server boundary
-
-### New Architecture (Current)
+### Current Architecture (Vercel)
 
 ```
-Frontend (React)
-  └── Environment-based API URLs
-      ├── Dev: http://localhost:5000 (Flask)
-      └── Prod: https://api-gateway-url (Lambda)
-            │
-            ├── Flask Backend (Development)
-            │   ├── /api/graph/data → In-memory cache
-            │   ├── /api/rag/chat → Bedrock service
-            │   ├── /api/pdf/url → S3 presigned URLs
-            │   └── /api/recommendations/from-resume → Bedrock
-            │
-            └── Lambda Backend (Production)
-                └── /api/graph/data → S3 cache read
+┌─────────────────────────────────────────────────────────────────┐
+│                         Vercel                                   │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│   Static Frontend (Vite Build)                                  │
+│   ├── index.html                                                │
+│   ├── assets/*.js, *.css                                        │
+│   └── graph_cache.json                                          │
+│                                                                  │
+│   Python Serverless Functions                                    │
+│   └── api/index.py                                              │
+│       └── Flask app (backend.app)                               │
+│           ├── /api/graph/data                                   │
+│           ├── /api/rag/chat                                     │
+│           ├── /api/recommendations/from-resume                   │
+│           └── /api/pdf/url                                      │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              │ AWS SDK (boto3)
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                         AWS                                      │
+├─────────────────────────────────────────────────────────────────┤
+│   DynamoDB          S3                 Bedrock                  │
+│   ├── researchers   └── PDFs           ├── Knowledge Base 1    │
+│   ├── papers            (presigned)    │   (paper chat)        │
+│   ├── paper-edges                      └── Knowledge Base 2    │
+│   ├── advisor_edges                        (recommendations)   │
+│   ├── library                                                   │
+│   └── lab-info                                                  │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-**Improvements:**
-- ✅ Secure: AWS credentials only in backend
-- ✅ Cached: Graph data pre-computed and served instantly
-- ✅ Scalable: Lambda auto-scaling, S3 CDN-ready
-- ✅ Debuggable: Centralized logging and error handling
+### File Structure
+
+```
+paper-pigeon/
+├── api/
+│   └── index.py                      # Vercel serverless entry point
+│
+├── backend/
+│   ├── app.py                        # Flask app, graph endpoints
+│   ├── graph_core.py                 # Graph builder (DynamoDB → JSON)
+│   ├── cache/
+│   │   └── graph_cache.json          # Local cache (development)
+│   ├── controllers/
+│   │   ├── pdf_controller.py         # /api/pdf/url
+│   │   ├── rag_controller.py         # /api/rag/chat
+│   │   └── recommendations_controller.py
+│   └── services/
+│       ├── dynamodb_service.py       # DynamoDB queries
+│       ├── s3_service.py             # S3 presigned URLs
+│       └── bedrock_service.py        # Bedrock RAG
+│
+├── src/
+│   ├── main.tsx                      # React entry point
+│   ├── App.tsx                       # Root component with routing
+│   ├── components/
+│   │   ├── ResearchNetworkGraph.tsx  # Main 3D graph
+│   │   ├── VRGraph.tsx               # VR graph mode
+│   │   ├── SearchBar.tsx             # Search + resume upload
+│   │   ├── ResearcherModal.tsx       # Researcher detail modal
+│   │   ├── PaperChatModal.tsx        # RAG chat interface
+│   │   └── ...
+│   └── services/
+│       ├── dynamodb.ts               # Frontend API client
+│       └── pdf.ts                    # Client-side PDF parsing
+│
+├── public/
+│   └── graph_cache.json              # Static graph data
+│
+├── vercel.json                       # Vercel configuration
+└── requirements.txt                  # Python dependencies
+```
 
 ---
 
-## Caching Strategy
+## Backend API
 
-### Why Caching Was Essential
+### Endpoints
 
-1. **Performance**: Building graph from DynamoDB took 30+ seconds
-   - Fetching all researchers, papers, edges, descriptions, metrics
-   - Complex nested queries and joins
-   - Multiple round-trips to DynamoDB
+#### `GET /api/graph/data`
+Returns the cached graph data.
 
-2. **Cost**: Every page load triggered expensive DynamoDB queries
-   - High read capacity requirements
-   - Unnecessary database load for static data
-
-3. **User Experience**: Long loading times (30s+) caused:
-   - Timeout errors
-   - Poor UX on slow connections
-   - Browser hanging/freezing
-
-4. **Reliability**: Direct DynamoDB calls were unreliable
-   - Environment variable loading issues
-   - Memory errors with large datasets
-   - Network timeouts
-
-### Caching Implementation
-
-**Two-Level Cache Strategy:**
-
-1. **Local Cache** (`backend/cache/graph_cache.json`)
-   - Built by `backend/tools/rebuild_graph_cache.py`
-   - Used by Flask development server
-   - In-memory loading on app startup
-
-2. **S3 Cache** (`s3://bucket-name/graph_cache.json`)
-   - Same JSON structure as local cache
-   - Read by Lambda function in production
-   - Updated via `tools/upload_cache.py`
-
-**Cache Rebuild Process:**
-```
-1. Rebuild script runs (manual or scheduled)
-   └── backend/tools/rebuild_graph_cache.py
-       ├── Calls build_graph_data_pure()
-       ├── Fetches all data from DynamoDB
-       ├── Builds nodes/links JSON
-       └── Saves to backend/cache/graph_cache.json
-
-2. Upload to S3 (production)
-   └── tools/upload_cache.py
-       └── Uploads cache to S3 for Lambda
-
-3. Lambda serves cached data
-   └── backend_lambda/lambda_function.py
-       └── Reads from S3, returns JSON
+**Response:**
+```json
+{
+  "nodes": [...],
+  "links": [...]
+}
 ```
 
-**Cache Update Frequency:**
-- Manual: Developer runs rebuild script when data changes
-- Scheduled: Cron/systemd timer runs daily
-- Future: Trigger on DynamoDB table updates (EventBridge)
+**Behavior:**
+- Loads from `backend/cache/graph_cache.json` (local)
+- Falls back to `public/graph_cache.json` (Vercel)
+- Returns empty graph if no cache found
+
+#### `POST /api/graph/rebuild-cache`
+**Status:** Disabled on Vercel (read-only filesystem)
+
+Returns:
+```json
+{
+  "ok": false,
+  "reason": "cache writing disabled on Vercel"
+}
+```
+
+#### `POST /api/graph/paper-lab-id`
+Gets the lab_id for a paper.
+
+**Request:**
+```json
+{ "document_id": "paper_123" }
+```
+
+**Response:**
+```json
+{ "lab_id": "aims_lab" }
+```
+
+#### `POST /api/rag/chat`
+Paper-specific RAG chat using Bedrock.
+
+**Request:**
+```json
+{
+  "query": "What is the main contribution?",
+  "document_id": "paper_123"
+}
+```
+
+**Response:**
+```json
+{
+  "answer": "The paper presents...",
+  "citations": [...]
+}
+```
+
+#### `POST /api/recommendations/from-resume`
+Recommends researchers based on resume text.
+
+**Request:**
+```json
+{ "resume_text": "..." }
+```
+
+**Response:**
+```json
+{
+  "recommendations": [
+    { "name": "Alice Smith", "score": 0.85 },
+    ...
+  ]
+}
+```
+
+#### `POST /api/pdf/url`
+Generates presigned S3 URL for a paper PDF.
+
+**Request:**
+```json
+{
+  "lab_id": "aims_lab",
+  "document_id": "paper_123"
+}
+```
+
+**Response:**
+```json
+{ "url": "https://s3.amazonaws.com/..." }
+```
+
+#### `GET /health`
+Health check endpoint.
+
+**Response:**
+```json
+{ "status": "ok" }
+```
 
 ---
 
-## Backend Architecture
+## Frontend Components
 
-### Development Backend (`backend/`)
+### Core Components
 
-**File Structure:**
+| Component | Description |
+|-----------|-------------|
+| `ResearchNetworkGraph.tsx` | Main 3D graph visualization with ForceGraph3D |
+| `VRGraph.tsx` | VR mode visualization at `/vr` route |
+| `SearchBar.tsx` | Search input with resume upload functionality |
+| `ResearcherModal.tsx` | Full researcher profile modal |
+| `ResearcherProfilePanel.tsx` | Hover panel for quick researcher info |
+| `PaperChatModal.tsx` | RAG chat interface for papers |
+| `RecommendationsModal.tsx` | Resume-based recommendations display |
+| `LabModal.tsx` | Lab information modal |
+| `AccessibilityPanel.tsx` | Accessibility settings panel |
+
+### Routing
+
+```tsx
+<BrowserRouter>
+  <Routes>
+    <Route path="/" element={<ResearchNetworkGraph />} />
+    <Route path="/vr" element={<VRGraph />} />
+  </Routes>
+</BrowserRouter>
 ```
-backend/
-├── app.py                    # Flask app, cache-first API
-├── graph_core.py             # Pure graph building logic
-├── services/
-│   ├── dynamodb_service.py   # DynamoDB queries (with in-memory cache)
-│   ├── s3_service.py         # S3 operations
-│   └── bedrock_service.py    # Bedrock RAG/recommendations
-├── controllers/
-│   ├── rag_controller.py     # /api/rag/chat
-│   ├── pdf_controller.py     # /api/pdf/url
-│   └── recommendations_controller.py  # /api/recommendations/from-resume
-├── cache/
-│   └── graph_cache.json      # Local cache file
-└── tools/
-    ├── rebuild_graph_cache.py    # Cache builder script
-    └── logs/
-        └── rebuilder.log         # Build logs
-```
-
-**Key Components:**
-
-1. **`app.py`** - Flask Application
-   - Loads `graph_cache.json` into memory on startup
-   - Serves `/api/graph/data` from in-memory cache (no DynamoDB)
-   - Provides `/api/graph/rebuild-cache` (POST) for manual rebuilds
-   - Registers blueprints for RAG, PDF, recommendations
-
-2. **`graph_core.py`** - Pure Graph Building
-   - `build_graph_data_pure()` - No Flask dependencies
-   - Fetches researchers, papers, edges from DynamoDB
-   - Builds nodes (researchers, labs) and links (paper, advisor edges)
-   - Returns `{"nodes": [...], "links": [...]}` dict
-
-3. **`dynamodb_service.py`** - Database Layer
-   - In-memory cache for `fetch_researchers()`, `fetch_papers()`, `fetch_library_entries()`
-   - Retry logic with exponential backoff
-   - Environment variable validation
-
-### Production Backend (`backend_lambda/`)
-
-**Lambda Function (`lambda_function.py`):**
-- Reads `graph_cache.json` from S3 bucket
-- Returns JSON with CORS headers
-- Error handling for missing cache, S3 errors, invalid JSON
-- Environment variables: `S3_BUCKET_NAME`, `CACHE_KEY`
-
-**Deployment:**
-- Zipped with `requirements.txt` (boto3 only)
-- Deployed via GitHub Actions
-- Connected to API Gateway
 
 ---
 
-## Frontend Graph Schema
-
-The frontend expects a specific JSON structure for nodes and links. See `FRONTEND_GRAPH_SCHEMA.md` for complete documentation.
+## Graph Data Schema
 
 ### Node Types
 
@@ -217,27 +268,27 @@ The frontend expects a specific JSON structure for nodes and links. See `FRONTEN
 ```typescript
 {
   id: string;              // researcher_id
-  name: string;            // display name
+  name: string;
   type: "researcher";
-  val: 1;                  // rendering size
+  val: 1;
   advisor?: string;
   contact_info?: string[];
-  labs?: string[];         // lab names
-  standing?: string;       // "Professor", "PhD Student", etc.
-  papers?: Paper[];        // full paper objects
-  tags?: string[];         // sorted research area tags
-  influence?: number;      // 0-100 score
-  about?: string;          // description text
+  labs?: string[];
+  standing?: string;
+  papers?: Paper[];
+  tags?: string[];
+  influence?: number;
+  about?: string;
 }
 ```
 
 **Lab Node:**
 ```typescript
 {
-  id: string;              // lab_id (e.g., "aims_lab")
-  name: string;            // display name (e.g., "AIMS Lab")
+  id: string;              // lab_id
+  name: string;
   type: "lab";
-  val: 2;                  // larger rendering size
+  val: 2;
 }
 ```
 
@@ -245,310 +296,144 @@ The frontend expects a specific JSON structure for nodes and links. See `FRONTEN
 
 ```typescript
 {
-  source: string;          // source node id
-  target: string;          // target node id
+  source: string;
+  target: string;
   type: "paper" | "advisor" | "researcher_lab";
 }
 ```
 
-**Link Types:**
 - `paper`: Two researchers co-authored a paper
 - `advisor`: Advisee → Advisor relationship
-- `researcher_lab`: Researcher belongs to lab (created client-side)
-
-### Client-Side Transformations
-
-The frontend (`ResearchNetworkGraph.tsx`) performs additional processing:
-- Adds `researcher_lab` links based on researcher `labs` field
-- Calculates node colors based on labs
-- Filters/transforms data for rendering
-- Handles missing/optional fields gracefully
-
-**Important:** The backend must match this exact schema. The `graph_core.py` module replicates the frontend's node/link creation logic.
+- `researcher_lab`: Researcher belongs to lab
 
 ---
 
-## Debugging History
+## AWS Integrations
 
-### Initial Problems
+### DynamoDB Tables
 
-1. **Environment Variable Loading Failure**
-   - **Symptom**: `AWS_REGION=None`, `NoRegionError` when running debug scripts
-   - **Root Cause**: Relative imports bypassed `backend/__init__.py` where `load_dotenv()` was called
-   - **Fix**: Updated imports to use absolute paths (`from backend.services import ...`), ensured `sys.path` setup
+| Table | Partition Key | Sort Key | Purpose |
+|-------|--------------|----------|---------|
+| `researchers` | `researcher_id` | - | Researcher metadata |
+| `papers` | `document_id` | - | Paper metadata |
+| `paper-edges` | `researcher_one_id` | `researcher_two_id` | Co-authorship |
+| `advisor_edges` | `advisee_id` | `advisor_id` | Advisor relationships |
+| `library` | `researcher_id` | `document_id` | Researcher → Paper mapping |
+| `lab-info` | `lab_id` | - | Lab descriptions |
+| `descriptions` | `researcher_id` | - | Researcher about text |
+| `metrics` | `researcher_id` | - | Influence scores |
 
-2. **Slow Graph Loading (30+ seconds)**
-   - **Symptom**: Frontend fetch to `/api/graph/data` timed out or took forever
-   - **Root Cause**: Live DynamoDB queries for every request, complex nested fetches
-   - **Fix**: Implemented cache-first architecture
+### Bedrock Knowledge Bases
 
-3. **Memory Errors**
-   - **Symptom**: `MemoryError` when building graph with large datasets
-   - **Root Cause**: Loading all data into memory without streaming
-   - **Fix**: Optimized data fetching, added error handling, implemented cache to avoid rebuilds
+- **Primary KB** (`BEDROCK_KNOWLEDGE_BASE_ID`): Paper chat
+- **Secondary KB** (`BEDROCK_KNOWLEDGE_BASE_ID_2`): Resume recommendations
 
-4. **Frontend-Backend URL Mismatch**
-   - **Symptom**: Fetch requests remained "pending", never reached backend
-   - **Root Cause**: Inconsistent URLs (`localhost` vs `127.0.0.1`), missing CORS
-   - **Fix**: Standardized on `localhost:5000`, added CORS headers, environment-based URLs
+### S3 Structure
 
-### Solutions Implemented
-
-✅ **Absolute imports**: All backend imports use `backend.*` paths  
-✅ **Centralized env loading**: `backend/__init__.py` loads `.env` before any boto3 calls  
-✅ **In-memory caching**: DynamoDB service caches researchers, papers, library entries  
-✅ **Pre-computed cache**: Graph built offline, served instantly  
-✅ **Error handling**: Graceful fallbacks, retry logic, logging  
-✅ **Environment-based URLs**: Frontend uses `VITE_API_URL` for dev/prod separation  
-
-### Why Caching Solved Everything
-
-1. **Eliminated slow DynamoDB queries**: Graph served in <100ms from cache
-2. **Reduced database load**: No queries during normal page loads
-3. **Fixed timeout errors**: Instant responses, no hanging requests
-4. **Improved reliability**: Cache rebuild fails gracefully, old cache still served
-5. **Easier debugging**: Cache file can be inspected, rebuilt independently
+```
+{bucket}/
+├── {lab_id}/
+│   ├── {document_id}.pdf
+│   └── ...
+└── ...
+```
 
 ---
 
-## AWS Deployment Progress
+## Deployment
 
-### ✅ Completed
+### Vercel Configuration (`vercel.json`)
 
-1. **Lambda Function Created**
-   - `backend_lambda/lambda_function.py` - S3 cache reader
-   - `backend_lambda/requirements.txt` - Dependencies
-   - `backend_lambda/README.md` - Deployment instructions
+```json
+{
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/index.py" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ],
+  "functions": {
+    "api/index.py": {
+      "includeFiles": "backend/**,public/graph_cache.json"
+    }
+  }
+}
+```
 
-2. **Frontend Environment Configuration**
-   - `.env` - Development (localhost:5000)
-   - `.env.production` - Production (API Gateway URL placeholder)
-   - All fetch calls updated to use `import.meta.env.VITE_API_URL`
+### Environment Variables
 
-3. **Cache Management Tools**
-   - `backend/tools/rebuild_graph_cache.py` - Cache builder with logging, retries
-   - `tools/upload_cache.py` - S3 upload script
+Set in Vercel Dashboard:
 
-4. **GitHub Actions Workflow**
-   - `.github/workflows/deploy.yml` - Automated deployment pipeline
-   - Builds frontend, uploads to S3, deploys Lambda
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `AWS_ACCESS_KEY_ID` | Yes | AWS credentials |
+| `AWS_SECRET_ACCESS_KEY` | Yes | AWS credentials |
+| `AWS_REGION` | Yes | AWS region |
+| `S3_BUCKET_NAME` | Yes | PDF bucket |
+| `BEDROCK_KNOWLEDGE_BASE_ID` | Yes | Paper chat KB |
+| `BEDROCK_KNOWLEDGE_BASE_ID_2` | Yes | Recommendations KB |
 
-5. **Documentation**
-   - `FRONTEND_GRAPH_SCHEMA.md` - Complete frontend schema specification
-   - `backend_lambda/README.md` - Lambda deployment guide
+### Deploy Process
 
-### 🔄 In Progress
-
-- **API Gateway Setup**: Need to create REST API and connect to Lambda
-- **S3 Buckets**: Need to create buckets for frontend and cache
-- **Environment Variables**: Need to configure Lambda env vars (`S3_BUCKET_NAME`, etc.)
-- **GitHub Secrets**: Need to add AWS credentials and bucket names to repository
-
-### ❌ Not Started
-
-- CloudFront distribution for frontend
-- Lambda@Edge for global caching
-- EventBridge trigger for cache rebuilds
-- Secret rotation mechanism
-- Monitoring and alerting
+1. Push to connected Git repository
+2. Vercel builds frontend with `pnpm build`
+3. Vercel deploys `api/index.py` as Python serverless function
+4. Static files served from Vite build output
+5. API calls routed to serverless function
 
 ---
 
-## Where We Left Off
+## Development Guide
 
-> ⚠️ **CURRENT STATUS - ACTION REQUIRED** ⚠️
->
-> **Last completed task**: Created GitHub Actions deployment workflow (`.github/workflows/deploy.yml`)
->
-> **Next immediate step**: **Create production Lambda function in AWS Console**
->
-> ### What Needs to Happen Next:
->
-> 1. **Deploy Lambda Function**
->    - Create Lambda function in AWS Console (Python 3.12)
->    - Upload `backend_lambda/lambda_function.py` code
->    - Set environment variables:
->      - `S3_BUCKET_NAME` = your cache bucket name
->      - `CACHE_KEY` = `graph_cache.json`
->    - Configure IAM role with S3 GetObject permission
->
-> 2. **Create API Gateway**
->    - Create REST API in API Gateway
->    - Create resource: `/api/graph`
->    - Create method: `GET` → Integration: Lambda Function
->    - Enable CORS
->    - Deploy API (create stage: `prod`)
->    - Copy the API Gateway URL
->
-> 3. **Update Production Environment**
->    - Update `.env.production` with actual API Gateway URL:
->      ```
->      VITE_API_URL=https://your-api-id.execute-api.us-west-2.amazonaws.com/prod
->      ```
->
-> 4. **Build and Upload Cache**
->    - Run `python backend/tools/rebuild_graph_cache.py` locally
->    - Run `python tools/upload_cache.py` to upload to S3
->    - Verify Lambda can read cache from S3
->
-> 5. **Configure GitHub Secrets**
->    - Add to repository secrets:
->      - `AWS_ACCESS_KEY_ID`
->      - `AWS_SECRET_ACCESS_KEY`
->      - `FRONTEND_BUCKET` (S3 bucket for frontend static files)
->      - `LAMBDA_NAME` (name of your Lambda function)
->
-> 6. **Test Deployment**
->    - Push to `main` branch
->    - Verify GitHub Actions workflow runs successfully
->    - Test frontend at S3 bucket URL
->    - Verify Lambda serves graph data correctly
+### Local Development
 
----
-
-## Future Roadmap
-
-### Short Term (1-2 weeks)
-
-1. **Complete AWS Setup**
-   - [ ] Deploy Lambda function to AWS
-   - [ ] Create API Gateway endpoint
-   - [ ] Create S3 buckets (frontend + cache)
-   - [ ] Configure CloudFront distribution
-   - [ ] Test end-to-end deployment
-
-2. **CI/CD Pipeline**
-   - [ ] Verify GitHub Actions workflow works
-   - [ ] Add deployment notifications (Slack/email)
-   - [ ] Set up staging environment
-   - [ ] Add automated testing to pipeline
-
-3. **Cache Automation**
-   - [ ] Set up scheduled cache rebuilds (cron/systemd)
-   - [ ] Add cache invalidation on DynamoDB updates
-   - [ ] Monitor cache freshness
-
-### Medium Term (1-2 months)
-
-4. **Performance Optimization**
-   - [ ] Lambda provisioned concurrency (reduce cold starts)
-   - [ ] S3 Transfer Acceleration for cache uploads
-   - [ ] CloudFront caching for API responses
-   - [ ] Graph data compression (gzip)
-
-5. **Monitoring & Observability**
-   - [ ] CloudWatch dashboards (Lambda metrics, API Gateway)
-   - [ ] Error alerting (SNS/Slack)
-   - [ ] Cache hit rate monitoring
-   - [ ] User analytics (frontend errors, load times)
-
-6. **Security Hardening**
-   - [ ] API Gateway API keys or OAuth
-   - [ ] Lambda VPC configuration (if needed)
-   - [ ] S3 bucket policies (least privilege)
-   - [ ] Secret rotation mechanism
-
-### Long Term (3+ months)
-
-7. **Advanced Features**
-   - [ ] Multi-region deployment
-   - [ ] Lambda@Edge for global edge caching
-   - [ ] GraphQL API (alternative to REST)
-   - [ ] Real-time updates (WebSocket/Server-Sent Events)
-
-8. **Infrastructure as Code**
-   - [ ] Terraform/CloudFormation for AWS resources
-   - [ ] Automated environment provisioning
-   - [ ] Disaster recovery procedures
-
-9. **Alternative Architectures**
-   - [ ] S3 direct-loading option (bypass Lambda for graph data)
-   - [ ] CloudFront Functions for simple transformations
-   - [ ] Consider serverless framework migration
-
-### S3 Direct-Loading Option (Future Enhancement)
-
-**Idea**: Serve graph cache directly from S3 via CloudFront, bypassing Lambda entirely for the `/api/graph/data` endpoint.
-
-**Benefits:**
-- Zero compute cost (no Lambda invocations)
-- Faster responses (CloudFront edge caching)
-- Simpler architecture
-
-**Implementation:**
-1. Upload `graph_cache.json` to S3 with public-read ACL (or CloudFront OAC)
-2. Configure CloudFront distribution for S3 bucket
-3. Frontend fetches: `https://cdn.example.com/graph_cache.json`
-4. CloudFront caches at edge locations globally
-
-**Trade-offs:**
-- Less control over error handling
-- Cache must be public (or OAC with CloudFront)
-- No request logging/authentication at S3 level
-
-**When to Use:**
-- Graph data is truly public
-- Cost optimization is critical
-- Global distribution is needed
-
----
-
-## Key Files Reference
-
-### Backend
-- `backend/app.py` - Flask development server
-- `backend/graph_core.py` - Pure graph building logic
-- `backend/services/dynamodb_service.py` - Database layer with caching
-- `backend/tools/rebuild_graph_cache.py` - Cache builder script
-- `backend_lambda/lambda_function.py` - Production Lambda handler
-
-### Frontend
-- `src/services/dynamodb.ts` - Graph data fetching
-- `src/components/ResearchNetworkGraph.tsx` - 3D graph visualization
-- `.env` - Development API URL
-- `.env.production` - Production API URL
-
-### Deployment
-- `.github/workflows/deploy.yml` - CI/CD pipeline
-- `tools/upload_cache.py` - S3 cache upload script
-
-### Documentation
-- `FRONTEND_GRAPH_SCHEMA.md` - Complete frontend schema spec
-- `docs/PROJECT_CONTEXT.md` - This file
-- `backend_lambda/README.md` - Lambda deployment guide
-
----
-
-## Quick Start Commands
-
-### Development
 ```bash
-# Start Flask backend
+# Frontend
+pnpm install
+pnpm dev
+
+# Backend (separate terminal)
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
 python backend/app.py
-
-# Start frontend dev server
-npm run dev
-
-# Rebuild graph cache
-python backend/tools/rebuild_graph_cache.py
 ```
 
-### Production
+### Rebuilding Graph Cache
+
+The graph cache is pre-built and stored in `public/graph_cache.json`. To rebuild:
+
 ```bash
-# Build frontend
-npm run build
-
-# Upload cache to S3
-export S3_BUCKET_NAME=your-bucket
-python tools/upload_cache.py
-
-# Deploy (via GitHub Actions on push to main)
-git push origin main
+python backend/graph_core.py
 ```
+
+This requires AWS credentials with DynamoDB read access.
+
+### Testing
+
+```bash
+# Type checking
+pnpm build
+
+# Lint
+pnpm lint
+```
+
+---
+
+## Key Design Decisions
+
+1. **Cache-First Architecture**: Graph data is pre-computed and served from static JSON to avoid slow DynamoDB queries on every request.
+
+2. **Lazy Loading**: Graph cache loads on first request, not at import time, to avoid serverless cold start issues.
+
+3. **Read-Only on Vercel**: Cache writing is disabled because Vercel serverless has a read-only filesystem.
+
+4. **Relative API URLs**: Frontend uses relative URLs (`/api/...`) to work on any domain without configuration.
+
+5. **CORS Allow All**: Backend allows all origins (`*`) since Vercel handles domain security.
+
+6. **Environment Variable Fallbacks**: Backend checks both `AWS_*` and `VITE_*` prefixed environment variables for flexibility.
 
 ---
 
 **Document maintained by**: Development Team  
-**Last major update**: November 2025  
-**Next review**: After Lambda deployment completion
-
+**Last major update**: December 2025

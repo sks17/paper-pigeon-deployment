@@ -1,82 +1,120 @@
-# UW Research Network 3D Visualization
+# Paper Pigeon - Setup Guide
 
-A 3D interactive visualization of the University of Washington research network, built with React, TypeScript, and 3d-force-graph.
+A 3D interactive visualization of research networks, built with React, TypeScript, Flask, and 3d-force-graph.
 
 ## Features
 
 - **3D Interactive Graph**: Full-screen 3D visualization of research collaborations
-- **DynamoDB Integration**: Fetches data from AWS DynamoDB tables
+- **Flask Backend**: Python API with AWS integrations (DynamoDB, S3, Bedrock)
 - **Node Labels**: Displays researcher names on graph nodes
 - **Interactive Controls**: Click to focus on nodes, drag to move around
-- **Responsive Design**: Adapts to different screen sizes
+- **VR Mode**: Optional VR visualization at `/vr` route
+- **RAG Chat**: Ask questions about research papers
+- **Resume Matching**: Upload resume to find matching researchers
 
-## Setup Instructions
+## Quick Start
 
-### 1. Environment Variables
-
-Create a `.env` file in the project root with your AWS credentials:
-
-```env
-VITE_AWS_ACCESS_KEY_ID=your_access_key_here
-VITE_AWS_SECRET_ACCESS_KEY=your_secret_key_here
-VITE_AWS_REGION=us-west-2
-```
-
-### 2. AWS DynamoDB Tables
-
-Ensure you have the following DynamoDB tables in your AWS account:
-
-#### `researchers` table
-- **Partition Key**: `researcher_id` (String)
-- **Attributes**: 
-  - `name` (String) - Researcher's name
-
-#### `paper-edges` table
-- **Partition Key**: `researcher_one_id` (String)
-- **Sort Key**: `researcher_two_id` (String)
-- **Attributes**: None required
-
-### 3. Install Dependencies
+### 1. Install Dependencies
 
 ```bash
+# Frontend
 pnpm install
+
+# Backend (optional for local development)
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+pip install -r requirements.txt
 ```
 
-### 4. Run the Application
+### 2. Run Development Server
 
 ```bash
+# Frontend only (uses deployed API or static cache)
 pnpm dev
+
+# Backend (separate terminal, if needed)
+python backend/app.py
 ```
 
 The application will be available at `http://localhost:5173`
 
+## Vercel Deployment
+
+### Environment Variables
+
+Set these in Vercel Dashboard → Settings → Environment Variables:
+
+| Variable | Description |
+|----------|-------------|
+| `AWS_ACCESS_KEY_ID` | AWS IAM access key |
+| `AWS_SECRET_ACCESS_KEY` | AWS IAM secret key |
+| `AWS_REGION` | AWS region (e.g., `us-west-2`) |
+| `S3_BUCKET_NAME` | S3 bucket containing PDF files |
+| `BEDROCK_KNOWLEDGE_BASE_ID` | Primary Bedrock knowledge base |
+| `BEDROCK_KNOWLEDGE_BASE_ID_2` | Secondary KB for recommendations |
+
+### Deploy
+
+Push to your connected Git repository. Vercel will:
+1. Build the React frontend with Vite
+2. Deploy Flask as a Python serverless function
+3. Serve the graph cache from `public/graph_cache.json`
+
 ## Usage
 
-- **Mouse Controls**: 
-  - Left click and drag to rotate the view
-  - Right click and drag to pan
-  - Scroll to zoom in/out
-- **Node Interaction**:
-  - Click on any node to focus the camera on it
-  - Drag nodes to move them around (if enabled)
+### Mouse Controls
+- **Left click and drag**: Rotate the view
+- **Right click and drag**: Pan
+- **Scroll**: Zoom in/out
+
+### Node Interaction
+- **Hover**: Show researcher profile panel
+- **Click researcher**: Open full profile modal
+- **Click lab**: Open lab information modal
+
+### Search
+- Type to search researchers, labs, or tags
+- Use arrow keys to navigate results
+- Press Enter to select
+
+### Resume Upload
+- Click the upload button next to search
+- Upload a PDF resume
+- View matched researchers based on research interests
+
+### Paper Chat
+- Click a paper in a researcher's profile
+- Ask questions about the paper
+- View AI-generated answers with citations
 
 ## Data Structure
 
-The application expects data in the following format:
+### Graph Cache (`public/graph_cache.json`)
 
-### Researchers Table
-```json
-{
-  "researcher_id": "unique_id",
-  "name": "Researcher Name"
-}
-```
+The graph data follows this schema:
 
-### Paper Edges Table
-```json
-{
-  "researcher_one_id": "researcher_id_1",
-  "researcher_two_id": "researcher_id_2"
+```typescript
+interface GraphData {
+  nodes: Array<{
+    id: string;              // researcher_id or lab_id
+    name: string;            // display name
+    type: 'researcher' | 'lab';
+    val: number;             // 1 for researchers, 2 for labs
+    // Researcher fields:
+    advisor?: string;
+    contact_info?: string[];
+    labs?: string[];
+    standing?: string;
+    papers?: Paper[];
+    tags?: string[];
+    influence?: number;
+    about?: string;
+  }>;
+  links: Array<{
+    source: string;
+    target: string;
+    type: 'paper' | 'advisor' | 'researcher_lab';
+  }>;
 }
 ```
 
@@ -85,24 +123,37 @@ The application expects data in the following format:
 ### Common Issues
 
 1. **"Failed to load research network data"**
-   - Check your AWS credentials in the `.env` file
-   - Ensure your AWS region is correct
-   - Verify that the DynamoDB tables exist and have data
+   - Check that the backend is running (local) or Vercel environment variables are set
+   - Verify `public/graph_cache.json` exists
 
 2. **Empty graph**
-   - Check that both tables have data
-   - Ensure researcher IDs in the edges table match those in the researchers table
+   - Check browser console for errors
+   - Verify graph cache has data
 
-3. **CORS errors**
-   - This is a client-side application that directly connects to DynamoDB
-   - Ensure your AWS credentials have the necessary DynamoDB permissions
-   - Consider using AWS Cognito for production deployments
+3. **API errors (500)**
+   - Check Vercel function logs for detailed error messages
+   - Verify AWS credentials and permissions
+   - Ensure Bedrock knowledge bases are set up correctly
+
+4. **CORS errors**
+   - Backend is configured to allow all origins (`*`)
+   - If issues persist, check Vercel deployment logs
+
+### Local Development
+
+For local development without AWS:
+- The graph will load from `public/graph_cache.json`
+- RAG chat and recommendations will fail (require AWS credentials)
+- PDF links will not work (require S3 access)
 
 ## Technologies Used
 
 - **React 19** - UI framework
 - **TypeScript** - Type safety
+- **Vite 7** - Build tool
 - **3d-force-graph** - 3D graph visualization
-- **AWS SDK v3** - DynamoDB integration
+- **three.js** - 3D graphics
+- **Flask** - Python backend
+- **boto3** - AWS SDK for Python
 - **Tailwind CSS** - Styling
-- **Vite** - Build tool
+- **shadcn/ui** - UI components

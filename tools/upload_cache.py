@@ -31,7 +31,7 @@ def main():
     
     # Get cache file path (relative to project root)
     script_dir = Path(__file__).parent.absolute()
-    project_root = script_dir
+    project_root = script_dir.parent  # Go up from tools/ to project root
     cache_path = project_root / "backend" / "cache" / "graph_cache.json"
     
     if not cache_path.exists():
