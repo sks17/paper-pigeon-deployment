@@ -1,3 +1,12 @@
+"""
+RAG Controller - Paper Q&A using AWS Bedrock retrieval-augmented generation.
+
+Routes:
+    GET  /api/rag/test - Health check
+    POST /api/rag/chat - Ask questions about a specific paper
+
+Includes diagnostic logging (disabled in production via NODE_ENV).
+"""
 from flask import Blueprint, jsonify, request
 import traceback
 import time

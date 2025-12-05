@@ -1,3 +1,9 @@
+/**
+ * Paper Pigeon - Root Application Component
+ *
+ * Handles routing between the main 3D graph view and VR mode.
+ * Graph data is fetched once at the app level and passed down to child routes.
+ */
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import ResearchNetworkGraph from './components/ResearchNetworkGraph'

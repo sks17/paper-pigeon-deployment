@@ -2,23 +2,30 @@
 
 <br/>
 
-<!-- Banner Section -->
+<!-- Banner Section with White Background -->
+<table>
+<tr>
+<td align="center" style="background-color: white; padding: 40px;">
+
 <a href="https://paper-pigeon-deployment.vercel.app/">
-  <img src="src/assets/favicon.jpeg" alt="Paper Pigeon Logo" width="120" height="120" style="border-radius: 20px;" />
+  <img src="src/assets/favicon.jpeg" alt="Paper Pigeon Logo" width="140" height="140" />
 </a>
 
 <br/>
 <br/>
 
-# ✨ Paper Pigeon ✨
+<h1 style="color: black;">🐦 Paper Pigeon</h1>
 
-<br/>
-
-**Explore research like never before — a 3D universe of ideas takes flight.**
+**Visualize the University of Washington Allen School's research output in 3D!**  
+**Ideas take flight.**
 
 <br/>
 
 [![Live Demo](https://img.shields.io/badge/🚀_Live_Demo-paper--pigeon.vercel.app-blue?style=for-the-badge)](https://paper-pigeon-deployment.vercel.app/)
+
+</td>
+</tr>
+</table>
 
 <br/>
 
@@ -101,10 +108,10 @@ Lightning-fast load times. The entire research network is pre-computed and cache
 ### ☁️ **Serverless Architecture**
 Zero servers to maintain. Flask API runs as Vercel Serverless Functions with automatic scaling.
 
-### 🕐 **Cloudflare Scheduled Rebuilds**
-Nightly cron jobs keep the graph fresh. New papers and researchers appear automatically.
+### 🕐 **Scheduled Cache Rebuilds**
+Automated jobs keep the graph fresh. New papers and researchers appear automatically.
 
-### 📎 **PDF Scanning & S3 Uploads**
+### 📎 **PDF Scanning & S3 Access**
 Client-side PDF parsing meets secure S3 presigned URLs. Access papers instantly, securely.
 
 ### 🎨 **Modern Frontend**
@@ -134,7 +141,7 @@ Built with Vite + React 19 + TypeScript. Tailwind CSS for that crisp, responsive
 
 <br/>
 
-> 💡 **Note:** This diagram is a conceptual overview of the system. The actual implementation may vary in specific details, but the overall data flow and component boundaries are accurately represented.
+> 💡 **Note:** This diagram is a conceptual overview of the full system architecture. Some components shown (testing layer, cron workers, data pipeline scripts) are maintained in a private repository. See [What's Not Included](#-whats-not-included) below.
 
 <br/>
 
@@ -161,7 +168,7 @@ Built with Vite + React 19 + TypeScript. Tailwind CSS for that crisp, responsive
 
 **Cache & Scheduling**
 
-7. **Cloudflare Workers** run a nightly cron job
+7. **Cloudflare Workers** run scheduled cron jobs (private repo)
 8. The **Graph Cache Builder** (Python) queries DynamoDB and generates `graph_cache.json`
 9. This static cache enables instant graph loads without runtime database queries
 
@@ -174,13 +181,13 @@ Built with Vite + React 19 + TypeScript. Tailwind CSS for that crisp, responsive
 | **CI/CD** | GitHub → Vercel | Automated deployments on every push |
 | **Testing** | Playwright + Python | Frontend E2E tests & backend health checks |
 | **Frontend** | Vite + React + TypeScript | Fast, modern SPA with 3D visualization |
-| **Backend** | Flask on Vercel Serverless | API routes with zero cold-start overhead |
+| **Backend** | Flask on Vercel Serverless | API routes for data access |
 | **3D Engine** | 3d-force-graph + Three.js | WebGL-powered network visualization |
 | **VR** | A-Frame + 3d-force-graph-vr | Immersive VR research exploration |
 | **AI/ML** | AWS Bedrock | RAG chat & semantic resume matching |
 | **Database** | DynamoDB | Researchers, papers, edges, metadata |
 | **Storage** | S3 | PDF documents with presigned URL access |
-| **Scheduling** | Cloudflare Workers | Nightly graph cache rebuilds |
+| **Scheduling** | Cloudflare Workers | Scheduled graph cache rebuilds |
 | **Cache** | Static JSON | Pre-computed graph for instant loads |
 
 <br/>
@@ -255,32 +262,14 @@ Create a `.env` file or set these in your Vercel dashboard:
 
 <br/>
 
-### Rebuild Graph Cache
+### Build & Lint
 
 ```bash
-# Rebuild from DynamoDB (requires AWS credentials)
-python backend/build_graph_cache.py
-
-# Upload to S3 (optional, for Lambda deployments)
-python tools/upload_cache.py
-```
-
-<br/>
-
-### Testing
-
-```bash
-# TypeScript type checking + build
+# TypeScript type checking + production build
 pnpm build
 
 # Lint
 pnpm lint
-
-# Run Playwright tests (if configured)
-npx playwright test
-
-# Backend health check
-curl http://localhost:5000/health
 ```
 
 <br/>
@@ -356,15 +345,46 @@ paper-pigeon/
 
 <div align="center">
 
-## 🤝 Contributing
+## 📬 What's Not Included
 
-Pull requests welcome! For major changes, please open an issue first.
+</div>
 
 <br/>
 
-## 📜 License
+> **This is the public repository.** Some components are maintained privately:
 
-MIT
+| Component | Status | Description |
+|-----------|:------:|-------------|
+| **Cloudflare Cron Script** | 🔒 Private | Scheduled worker that triggers nightly cache rebuilds |
+| **DynamoDB Data Pipeline** | 🔒 Private | Scripts for populating researcher/paper data |
+| **Graph Cache Builder** | 🔒 Private | Full data-pulling logic for `graph_cache.json` |
+| **Playwright Test Suite** | 🔒 Private | E2E frontend tests |
+| **Backend Health Tests** | 🔒 Private | Python test suite for API endpoints |
+| **Working API Endpoints** | 🔒 Private | Requires AWS credentials & Bedrock KBs |
+
+<br/>
+
+### 🤝 Want Access?
+
+If you'd like any of the following, please reach out:
+
+- 📧 **API endpoints** for testing the frontend locally
+- 🔧 **Private repo components** (cron, data pipeline, tests)
+- 💬 **Questions or collaboration**
+
+**Contact:** [sks17@outlook.com](mailto:sks17@outlook.com)
+
+<br/>
+
+---
+
+<br/>
+
+<div align="center">
+
+## 🤝 Contributing
+
+Pull requests welcome! For major changes, please open an issue first.
 
 <br/>
 <br/>
@@ -373,7 +393,7 @@ MIT
 
 <br/>
 
-**Built with 💜 by researchers, for researchers.**
+**Built with 💜 for the UW Allen School research community.**
 
 <br/>
 

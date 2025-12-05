@@ -1,8 +1,24 @@
+"""
+DynamoDB Service - Database access layer for researcher and paper data.
+
+Provides functions to query DynamoDB tables with in-memory caching
+to reduce redundant reads during graph building operations.
+
+Tables accessed:
+    - researchers    : Researcher profiles
+    - papers         : Paper metadata
+    - paper-edges    : Co-authorship relationships
+    - advisor_edges  : Advisor-advisee relationships
+    - library        : Researcher-to-paper mappings
+    - descriptions   : Researcher about text
+    - metrics        : Researcher influence scores
+    - lab-info       : Lab metadata
+"""
 import os
 import boto3
 from boto3.dynamodb.conditions import Attr
 
-# In-memory cache for DynamoDB reads
+# In-memory cache for DynamoDB reads (reduces API calls during graph build)
 CACHE_RESEARCHERS = {}
 CACHE_PAPERS = {}
 CACHE_LIBRARY_ENTRIES = {}

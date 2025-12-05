@@ -1,3 +1,10 @@
+"""
+PDF Controller - Handles PDF document access via S3 presigned URLs.
+
+Routes:
+    GET  /api/pdf/test  - Health check
+    POST /api/pdf/url   - Generate presigned URL for a paper PDF
+"""
 from flask import Blueprint, jsonify, request
 from backend.services.s3_service import get_presigned_pdf_url
 

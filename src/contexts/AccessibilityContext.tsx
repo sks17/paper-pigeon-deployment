@@ -1,3 +1,10 @@
+/**
+ * Accessibility Context - Global accessibility settings management.
+ *
+ * Provides high contrast, colorblind modes, reduced motion, and font size
+ * preferences. Settings are persisted to localStorage and applied via
+ * CSS custom properties on the document root.
+ */
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
 interface AccessibilitySettings {

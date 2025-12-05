@@ -1,3 +1,10 @@
+"""
+Recommendations Controller - Resume-based researcher matching.
+
+Routes:
+    GET  /api/recommendations/test        - Health check
+    POST /api/recommendations/from-resume - Get researcher recommendations from resume text
+"""
 from flask import Blueprint, jsonify, request
 from backend.services.bedrock_service import rag_recommend
 

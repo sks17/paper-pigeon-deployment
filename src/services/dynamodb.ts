@@ -1,3 +1,15 @@
+/**
+ * Frontend API Client for Graph Data.
+ *
+ * This service handles all communication with the backend API.
+ * Note: Despite the filename, this does NOT directly access DynamoDB.
+ * All data flows through the Flask backend API.
+ */
+
+// ============================================================================
+// Type Definitions
+// ============================================================================
+
 export interface Paper {
   title: string;
   year: number;
@@ -45,8 +57,15 @@ export interface GraphData {
   links: Link[];
 }
 
+// ============================================================================
+// API Functions
+// ============================================================================
+
+/**
+ * Fetches the complete graph data from the backend.
+ * Returns pre-computed nodes and links for the 3D visualization.
+ */
 export async function fetchGraphData(): Promise<GraphData> {
-  // Use relative URL - works on any domain without VITE_API_URL
   const url = '/api/graph/data';
   
   const res = await fetch(url);
@@ -58,6 +77,10 @@ export async function fetchGraphData(): Promise<GraphData> {
   return await res.json();
 }
 
+/**
+ * Resolves a paper's document_id to its associated lab_id.
+ * Used for constructing S3 paths for PDF access.
+ */
 export async function fetchPaperLabId(documentId: string): Promise<string | null> {
   const res = await fetch('/api/graph/paper-lab-id', {
     method: "POST",
@@ -71,9 +94,17 @@ export async function fetchPaperLabId(documentId: string): Promise<string | null
   return data.lab_id || null;
 }
 
+// ============================================================================
+// Legacy Service Object (Stub)
+// ============================================================================
+
+/**
+ * Legacy service object maintained for backwards compatibility.
+ * New code should use the standalone functions above.
+ */
 export const DynamoDBService = {
+  /** Stub - lab info is embedded in graph data, no separate fetch needed */
   async fetchLabInfos(_labIds: string[]): Promise<LabInfo[]> {
-    // Stub implementation - backend should handle this
     return [];
   }
 };

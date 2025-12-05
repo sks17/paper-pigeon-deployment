@@ -1,9 +1,22 @@
+/**
+ * PDF Parsing Service - Client-side PDF text extraction.
+ *
+ * Uses pdf.js to extract text content from uploaded PDF files.
+ * Primarily used for parsing resumes for the recommendation feature.
+ */
 import { getDocument, GlobalWorkerOptions, type PDFDocumentProxy } from 'pdfjs-dist';
 
-// Configure PDF.js worker; Vite will resolve this URL at build time.
-// If this path ever fails in your bundler, consider importing from 'pdfjs-dist/webpack' helpers.
-GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString();
+// Configure PDF.js worker - Vite resolves this URL at build time
+GlobalWorkerOptions.workerSrc = new URL(
+  'pdfjs-dist/build/pdf.worker.min.mjs',
+  import.meta.url
+).toString();
 
+/**
+ * Extracts all text content from a PDF file.
+ * @param file - The PDF file to parse
+ * @returns Combined text from all pages
+ */
 export async function parsePdf(file: File): Promise<string> {
   const arrayBuffer = await file.arrayBuffer();
   const loadingTask = getDocument({ data: arrayBuffer });
